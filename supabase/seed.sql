@@ -1,2 +1,2 @@
--- Seed data will be added after the v1 schema is approved.
-
+-- Seed data is intentionally minimal because rows are scoped to auth.users.
+-- Use the web UI or a one-off authenticated script to create the first profile.

@@ -44,21 +44,40 @@ Thread policy:
 
 - Long-lived onboarding thread.
 
-### Job Finder Agent
+### Job Sourcing Agent
 
 Purpose:
 
-- Find active opportunities.
-- Set up durable sources during onboarding.
+- Find and maintain durable opportunity sources.
+- Set up source monitors during onboarding and scheduled discovery refreshes.
 - Prefer GitHub repos, company boards, school/event sources, niche lists, and relevant social/resource accounts over broad job boards.
 - Create source monitor proposals.
-- Create application records and tasks.
-- Configure scheduled application status checks when an application is created.
+- Trigger Source Adapter Builder jobs for sources that need parsers.
+- Support manual browser/computer-use discovery runs when the user kicks off a search.
 
 Thread policy:
 
 - One global strategy thread.
 - One thread per source for recurring source context.
+
+Spec:
+
+- See [Job Sourcing Agent Spec](JOB_SOURCING_AGENT_SPEC.md).
+
+### Opportunity Recommender Agent
+
+Purpose:
+
+- Consume raw signals from source monitors.
+- Dedupe opportunities.
+- Rank opportunities against target roles, goals, constraints, and source quality.
+- Create opportunity records, application candidates, and next-action tasks.
+- Configure scheduled application status checks when an application is created.
+
+Thread policy:
+
+- One global recommendation thread.
+- Optional one thread per high-value source or opportunity cluster.
 
 ### Source Adapter Builder Agent
 

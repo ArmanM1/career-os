@@ -1,0 +1,21 @@
+{
+  "name": "career-os",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm --workspace @career-os/web run dev",
+    "worker": "npm --workspace @career-os/worker run dev",
+    "build": "npm --workspaces --if-present run build",
+    "typecheck": "npm --workspaces --if-present run typecheck",
+    "lint": "npm --workspaces --if-present run lint",
+    "seed:demo": "npm --workspace @career-os/worker run seed:demo",
+    "supabase:push": "npx supabase db push --workdir C:\\tmp\\career-os-supabase-link"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

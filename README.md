@@ -21,6 +21,7 @@ The project is not a generic career product. It is a personal operating system f
 - [Candidate object catalog](docs/OBJECT_CATALOG.md)
 - [Agents and routing](docs/AGENTS_AND_ROUTING.md)
 - [Source monitors and job search](docs/SOURCE_MONITORS.md)
+- [Job Sourcing agent spec](docs/JOB_SOURCING_AGENT_SPEC.md)
 - [Resume library](docs/RESUME_LIBRARY.md)
 - [Supabase setup](docs/SUPABASE_SETUP.md)
 - [Roadmap](docs/ROADMAP.md)
@@ -39,3 +40,25 @@ The first useful version should support:
 8. Resume library with LaTeX-backed role-specific variants.
 9. Weekly briefing that updates tasks based on goals, applications, events, source monitors, and check-ins.
 10. Codex-backed local agent worker that can run jobs, build scripts, and propose structured database mutations.
+
+## Local Development
+
+```bash
+npm install
+npm run dev
+npm run worker
+```
+
+The web app runs from `apps/web`. The local worker runs from `apps/worker` and expects Supabase service credentials in `.env.local`.
+
+Useful commands:
+
+```bash
+npm run typecheck
+npm run lint
+npm run build
+npm run supabase:push
+npm run seed:demo
+```
+
+`npm run seed:demo` requires `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `CAREER_OS_SEED_USER_ID`.

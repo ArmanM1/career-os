@@ -1,0 +1,260 @@
+import { z } from "zod";
+
+export const actorSchema = z.enum(["user", "agent", "system"]);
+export const confidenceSchema = z.enum(["low", "medium", "high"]);
+export const approvalPolicySchema = z.enum([
+  "auto_apply",
+  "approval_required",
+  "never_auto_apply",
+]);
+
+export const objectTypeSchema = z.enum([
+  "profile",
+  "academic_context",
+  "constraint",
+  "goal",
+  "task",
+  "opportunity",
+  "company",
+  "role_target",
+  "application",
+  "application_status_check",
+  "contact",
+  "mentor_relationship",
+  "event",
+  "source_monitor",
+  "source_run",
+  "resume_template",
+  "resume_version",
+  "resume_variant",
+  "resume_bullet",
+  "experience",
+  "project",
+  "skill",
+  "evidence",
+  "connected_account",
+  "agent_job",
+  "approval_request",
+]);
+
+export const careerObjectEnvelopeSchema = z.object({
+  id: z.string().uuid(),
+  objectType: objectTypeSchema,
+  title: z.string(),
+  status: z.string(),
+  labels: z.array(z.string()).default([]),
+  priority: z.number().int().optional(),
+  dueAt: z.string().datetime().optional(),
+  relatedGoalIds: z.array(z.string().uuid()).default([]),
+  relatedApplicationIds: z.array(z.string().uuid()).default([]),
+  relatedOpportunityIds: z.array(z.string().uuid()).default([]),
+  relatedContactIds: z.array(z.string().uuid()).default([]),
+  relatedEventIds: z.array(z.string().uuid()).default([]),
+  evidenceIds: z.array(z.string().uuid()).default([]),
+  createdBy: actorSchema,
+  createdByAgentRunId: z.string().uuid().optional(),
+  updatedBy: actorSchema,
+  updatedByAgentRunId: z.string().uuid().optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export const goalSchema = careerObjectEnvelopeSchema.extend({
+  objectType: z.literal("goal"),
+  horizon: z.enum(["long_term", "1_year", "90_day", "30_day", "week"]),
+  track: z.enum(["swe", "entrepreneurship", "fde", "exploration", "general"]),
+  parentGoalId: z.string().uuid().optional(),
+  targetDate: z.string().optional(),
+  allocationPercent: z.number().min(0).max(100).optional(),
+  rationale: z.string(),
+});
+
+export const academicContextSchema = careerObjectEnvelopeSchema.extend({
+  objectType: z.literal("academic_context"),
+  institution: z.string().optional(),
+  degreeProgram: z.string().optional(),
+  currentYear: z.enum(["freshman", "sophomore", "junior", "senior", "masters", "other"]).optional(),
+  currentTerm: z.string().optional(),
+  expectedGraduationDate: z.string().optional(),
+  recruitingSeason: z
+    .enum(["off_cycle", "internship_peak", "new_grad_peak", "interview_season", "offer_decision"])
+    .optional(),
+  termStartDate: z.string().optional(),
+  termEndDate: z.string().optional(),
+  timezone: z.string(),
+});
+
+export const taskSchema = careerObjectEnvelopeSchema.extend({
+  objectType: z.literal("task"),
+  taskType: z.enum([
+    "job_app",
+    "mentor",
+    "event",
+    "resume",
+    "project",
+    "skill",
+    "research",
+    "admin",
+    "check_in",
+    "source_setup",
+    "status_check",
+  ]),
+  effort: z.enum(["small", "medium", "large"]),
+  urgency: z.enum(["low", "normal", "high", "time_sensitive"]),
+  energy: z.enum(["low", "medium", "high"]),
+  source: z.enum(["user", "agent", "monitor", "calendar", "email"]),
+  completionNotes: z.string().optional(),
+});
+
+export const applicationStatusSchema = z.enum([
+  "found",
+  "interested",
+  "drafting",
+  "ready_to_submit",
+  "submitted",
+  "oa",
+  "interview",
+  "rejected",
+  "ghosted",
+  "offer",
+  "withdrawn",
+]);
+
+export const applicationSchema = careerObjectEnvelopeSchema.extend({
+  objectType: z.literal("application"),
+  opportunityId: z.string().uuid(),
+  companyId: z.string().uuid().optional(),
+  status: applicationStatusSchema,
+  deadlineAt: z.string().datetime().optional(),
+  submittedAt: z.string().datetime().optional(),
+  resumeVariantId: z.string().uuid().optional(),
+  nextActionTaskId: z.string().uuid().optional(),
+  statusCheckPolicy: z.enum(["manual", "email", "portal", "calendar", "scheduled_agent"]),
+  nextStatusCheckAt: z.string().datetime().optional(),
+  lastStatusCheckedAt: z.string().datetime().optional(),
+  lastStatusEvidenceId: z.string().uuid().optional(),
+});
+
+export const opportunitySchema = careerObjectEnvelopeSchema.extend({
+  objectType: z.literal("opportunity"),
+  opportunityType: z.enum(["job", "internship", "event", "program", "fellowship", "competition", "other"]),
+  companyId: z.string().uuid().optional(),
+  roleTargetId: z.string().uuid().optional(),
+  url: z.string().url().optional(),
+  sourceMonitorId: z.string().uuid().optional(),
+  discoveredAt: z.string().datetime(),
+  deadlineAt: z.string().datetime().optional(),
+  fitRationale: z.string(),
+});
+
+export const applicationStatusCheckSchema = careerObjectEnvelopeSchema.extend({
+  objectType: z.literal("application_status_check"),
+  applicationId: z.string().uuid(),
+  checkSource: z.enum(["email", "portal", "calendar", "manual", "browser"]),
+  scheduledFor: z.string().datetime(),
+  completedAt: z.string().datetime().optional(),
+  resultStatus: z.enum(["no_change", "status_changed", "needs_review", "failed"]),
+  previousApplicationStatus: applicationStatusSchema.optional(),
+  detectedApplicationStatus: applicationStatusSchema.optional(),
+});
+
+export const sourceMonitorSchema = careerObjectEnvelopeSchema.extend({
+  objectType: z.literal("source_monitor"),
+  sourceType: z.enum([
+    "github_repo",
+    "company_careers_page",
+    "greenhouse_board",
+    "lever_board",
+    "ashby_board",
+    "school_event_calendar",
+    "newsletter",
+    "social_account",
+    "community_page",
+    "manual_list",
+    "email_application_status",
+    "application_portal",
+    "calendar_events",
+  ]),
+  url: z.string(),
+  fetchStrategy: z.enum(["http", "git_pull", "browser", "manual", "api"]),
+  schedule: z.string(),
+  localPath: z.string().optional(),
+  parserScriptPath: z.string().optional(),
+  requiresAuth: z.boolean(),
+  lastRunAt: z.string().datetime().optional(),
+});
+
+export const resumeVariantSchema = careerObjectEnvelopeSchema.extend({
+  objectType: z.literal("resume_variant"),
+  baseVersionId: z.string().uuid(),
+  applicationId: z.string().uuid().optional(),
+  companyId: z.string().uuid().optional(),
+  roleTargetId: z.string().uuid().optional(),
+  latexPath: z.string(),
+  pdfPath: z.string().optional(),
+  diffPath: z.string().optional(),
+  rationale: z.string(),
+  status: z.enum(["draft", "ready_for_review", "approved", "used", "archived"]),
+});
+
+export const connectedAccountSchema = careerObjectEnvelopeSchema.extend({
+  objectType: z.literal("connected_account"),
+  provider: z.enum(["google_calendar", "gmail", "github", "supabase", "browser_profile", "other"]),
+  status: z.enum(["not_connected", "connected", "needs_reauth", "disabled"]),
+  scopes: z.array(z.string()),
+  lastSyncedAt: z.string().datetime().optional(),
+  approvalRequiredForExpandedScopes: z.boolean(),
+});
+
+export const proposedMutationSchema = z.object({
+  id: z.string().uuid(),
+  mutationType: z.string(),
+  targetObjectType: objectTypeSchema,
+  targetObjectId: z.string().uuid().optional(),
+  payload: z.record(z.unknown()),
+  rationale: z.string(),
+  evidenceIds: z.array(z.string().uuid()).default([]),
+  confidence: confidenceSchema,
+  approvalPolicy: approvalPolicySchema,
+});
+
+export const agentOutputSchema = z.object({
+  summary: z.string(),
+  proposedMutations: z.array(proposedMutationSchema).default([]),
+  approvalRequests: z.array(
+    z.object({
+      actionType: z.string(),
+      title: z.string(),
+      description: z.string(),
+      targetObjectType: objectTypeSchema.optional(),
+      targetObjectId: z.string().uuid().optional(),
+      rationale: z.string(),
+      riskLevel: z.enum(["low", "medium", "high"]),
+      payload: z.record(z.unknown()).default({}),
+      evidenceIds: z.array(z.string().uuid()).default([]),
+    }),
+  ).default([]),
+  evidence: z.array(
+    z.object({
+      title: z.string(),
+      sourceType: z.string(),
+      sourceUrl: z.string().optional(),
+      excerpt: z.string().optional(),
+      payload: z.record(z.unknown()).default({}),
+    }),
+  ).default([]),
+  followUpQuestions: z.array(z.string()).default([]),
+  warnings: z.array(z.string()).default([]),
+});
+
+export type CareerObjectEnvelope = z.infer<typeof careerObjectEnvelopeSchema>;
+export type Goal = z.infer<typeof goalSchema>;
+export type Task = z.infer<typeof taskSchema>;
+export type Application = z.infer<typeof applicationSchema>;
+export type Opportunity = z.infer<typeof opportunitySchema>;
+export type SourceMonitor = z.infer<typeof sourceMonitorSchema>;
+export type ResumeVariant = z.infer<typeof resumeVariantSchema>;
+export type ConnectedAccount = z.infer<typeof connectedAccountSchema>;
+export type ProposedMutation = z.infer<typeof proposedMutationSchema>;
+export type AgentOutput = z.infer<typeof agentOutputSchema>;
+

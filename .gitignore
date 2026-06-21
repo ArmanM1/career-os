@@ -3,9 +3,12 @@ node_modules/
 
 # Build output
 .next/
+.turbo/
 dist/
 build/
 out/
+coverage/
+*.tsbuildinfo
 
 # Environment and secrets
 .env
@@ -24,10 +27,11 @@ logs/
 # Local agent/runtime artifacts
 .codex-local/
 .career-os-local/
+resumes/**/*.pdf
+resumes/**/.compile/
 
 # OS/editor files
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
-

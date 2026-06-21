@@ -84,7 +84,8 @@ Rules:
 
 - Prefer official feeds, RSS, emails, or public pages when available.
 - Use browser/computer use only when no structured path exists.
-- Authenticated browser monitoring requires approval and clear audit logs.
+- Authenticated browser monitoring requires either manual kickoff or an enabled source configuration, plus clear audit logs.
+- Posting, commenting, replying, or DMing from social accounts requires explicit approval and is outside normal monitor behavior.
 - The system should store extracted signals, not broad browsing history.
 
 ## Event Scanner
