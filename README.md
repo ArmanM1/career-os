@@ -22,6 +22,7 @@ The project is not a generic career product. It is a personal operating system f
 - [Agents and routing](docs/AGENTS_AND_ROUTING.md)
 - [Source monitors and job search](docs/SOURCE_MONITORS.md)
 - [Resume library](docs/RESUME_LIBRARY.md)
+- [Supabase setup](docs/SUPABASE_SETUP.md)
 - [Roadmap](docs/ROADMAP.md)
 
 ## First Build Target
@@ -32,6 +33,9 @@ The first useful version should support:
 2. A main action dashboard with tasks grouped by practical labels such as job app, mentor, event, resume, project, skill, research, and admin.
 3. Job search and source setup as part of onboarding.
 4. Application pipeline tracking.
-5. Resume library with LaTeX-backed role-specific variants.
-6. Weekly briefing that updates tasks based on goals, applications, events, source monitors, and check-ins.
-7. Codex-backed local agent worker that can run jobs, build scripts, and propose structured database mutations.
+5. Scheduled application status checks using email, calendar, application portals, and other approved sources.
+6. Calendar-aware constraints and event-driven tasks.
+7. College journey awareness, including current year, term, recruiting season, graduation timeline, and date/time context.
+8. Resume library with LaTeX-backed role-specific variants.
+9. Weekly briefing that updates tasks based on goals, applications, events, source monitors, and check-ins.
+10. Codex-backed local agent worker that can run jobs, build scripts, and propose structured database mutations.

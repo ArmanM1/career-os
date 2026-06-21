@@ -37,6 +37,7 @@ Purpose:
 
 - Run dynamic interviews.
 - Ingest resumes, projects, GitHub, calendar/email permissions, target roles, preferences, and constraints.
+- Determine academic context: college year, current term, expected graduation date, school calendar, timezone, and recruiting season.
 - Build the initial profile, goals, applications strategy, resume library baseline, and source monitor proposals.
 
 Thread policy:
@@ -52,6 +53,7 @@ Purpose:
 - Prefer GitHub repos, company boards, school/event sources, niche lists, and relevant social/resource accounts over broad job boards.
 - Create source monitor proposals.
 - Create application records and tasks.
+- Configure scheduled application status checks when an application is created.
 
 Thread policy:
 
@@ -78,6 +80,7 @@ Purpose:
 - Convert goals, timelines, applications, events, mentors, calendar availability, and recent activity into action items.
 - Reprioritize tasks when important opportunities appear.
 - Reflect completion rates and check-ins into pacing.
+- Account for academic calendar constraints, recruiting season, application deadlines, and scheduled status checks.
 
 Thread policy:
 
@@ -117,6 +120,7 @@ Purpose:
 - Find relevant events.
 - Tie events to goals, companies, applications, or mentors.
 - Recommend event tasks and follow-up actions.
+- Use calendar and email context when enabled to avoid conflicts and detect relevant school/company events.
 
 Thread policy:
 
@@ -135,6 +139,7 @@ Buttons and pages should route deterministically:
 | Onboarding | Onboarding |
 | Weekly Briefing | Weekly Planner |
 | Find Jobs | Job Finder |
+| Application Status Check | Job Finder |
 | Source Monitor Setup | Job Finder or Source Adapter Builder |
 | Resume Library | Resume Tailor |
 | Application Detail | Resume Tailor or Job Finder |
@@ -204,6 +209,9 @@ Initial read tools:
 - `career.events.list`
 - `career.resume.library_read`
 - `career.sources.list`
+- `career.academic_context.read`
+- `career.constraints.list`
+- `career.connected_accounts.list`
 
 Initial mutation tools:
 
@@ -211,6 +219,8 @@ Initial mutation tools:
 - `career.approvals.create`
 - `career.source_monitor.propose`
 - `career.resume_variant.create`
+- `career.application_status_check.schedule`
+- `career.application_status_check.record_result`
 
 The backend decides which mutations auto-apply.
 
@@ -242,4 +252,3 @@ Good use cases:
 - Weekly Planner asks one agent to inspect applications and another to inspect events.
 
 The parent agent should merge results and return one structured output.
-

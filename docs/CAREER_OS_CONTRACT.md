@@ -85,6 +85,47 @@ type Goal = CareerObjectEnvelope & {
 };
 ```
 
+### AcademicContext
+
+```ts
+type AcademicContext = CareerObjectEnvelope & {
+  objectType: "academic_context";
+  institution?: string;
+  degreeProgram?: string;
+  currentYear?: "freshman" | "sophomore" | "junior" | "senior" | "masters" | "other";
+  currentTerm?: string;
+  expectedGraduationDate?: string;
+  recruitingSeason?: "off_cycle" | "internship_peak" | "new_grad_peak" | "interview_season" | "offer_decision";
+  termStartDate?: string;
+  termEndDate?: string;
+  timezone: string;
+};
+```
+
+### Constraint
+
+```ts
+type Constraint = CareerObjectEnvelope & {
+  objectType: "constraint";
+  constraintType:
+    | "calendar"
+    | "academic"
+    | "deadline"
+    | "location"
+    | "eligibility"
+    | "visa"
+    | "budget"
+    | "energy"
+    | "time"
+    | "preference";
+  severity: "soft" | "hard";
+  startsAt?: string;
+  endsAt?: string;
+  source: "user" | "calendar" | "email" | "agent" | "system";
+  details: string;
+};
+```
+
 ### Task
 
 ```ts
@@ -100,7 +141,8 @@ type Task = CareerObjectEnvelope & {
     | "research"
     | "admin"
     | "check_in"
-    | "source_setup";
+    | "source_setup"
+    | "status_check";
   effort: "small" | "medium" | "large";
   urgency: "low" | "normal" | "high" | "time_sensitive";
   energy: "low" | "medium" | "high";
@@ -148,6 +190,26 @@ type Application = CareerObjectEnvelope & {
   submittedAt?: string;
   resumeVariantId?: string;
   nextActionTaskId?: string;
+  statusCheckPolicy: "manual" | "email" | "portal" | "calendar" | "scheduled_agent";
+  nextStatusCheckAt?: string;
+  lastStatusCheckedAt?: string;
+  lastStatusEvidenceId?: string;
+};
+```
+
+### ApplicationStatusCheck
+
+```ts
+type ApplicationStatusCheck = CareerObjectEnvelope & {
+  objectType: "application_status_check";
+  applicationId: string;
+  checkSource: "email" | "portal" | "calendar" | "manual" | "browser";
+  scheduledFor: string;
+  completedAt?: string;
+  resultStatus: "no_change" | "status_changed" | "needs_review" | "failed";
+  previousApplicationStatus?: Application["status"];
+  detectedApplicationStatus?: Application["status"];
+  evidenceIds: string[];
 };
 ```
 
@@ -174,6 +236,19 @@ type SourceMonitor = CareerObjectEnvelope & {
   parserScriptPath?: string;
   requiresAuth: boolean;
   lastRunAt?: string;
+};
+```
+
+### ConnectedAccount
+
+```ts
+type ConnectedAccount = CareerObjectEnvelope & {
+  objectType: "connected_account";
+  provider: "google_calendar" | "gmail" | "github" | "supabase" | "browser_profile" | "other";
+  status: "not_connected" | "connected" | "needs_reauth" | "disabled";
+  scopes: string[];
+  lastSyncedAt?: string;
+  approvalRequiredForExpandedScopes: boolean;
 };
 ```
 
@@ -207,6 +282,9 @@ Read tools:
 - `career.events.list`
 - `career.resume.library_read`
 - `career.sources.list`
+- `career.academic_context.read`
+- `career.constraints.list`
+- `career.connected_accounts.list`
 - `career.audit.list`
 
 Write/proposal tools:
@@ -216,6 +294,8 @@ Write/proposal tools:
 - `career.resume_variant.create`
 - `career.source_monitor.propose`
 - `career.source_adapter.write`
+- `career.application_status_check.schedule`
+- `career.application_status_check.record_result`
 
 Direct mutation should happen only inside the backend mutation applier, not inside agent prompts.
 
@@ -232,6 +312,8 @@ Backend validation should check:
 - duplicate opportunity/application detection
 - evidence attached for recommendations
 - UI envelope can be rendered
+- application status changes include evidence
+- calendar/email-derived changes cite their external reference
 
 ## UI Rendering
 
@@ -245,4 +327,3 @@ The UI should render from object fields:
 - audit log from `AuditLogEntry`
 
 Agent summaries are useful, but they are not the UI source of truth.
-

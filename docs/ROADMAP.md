@@ -11,6 +11,7 @@ Deliverables:
 - Resume library design.
 - Initial database schema draft.
 - Initial mutation schema draft.
+- Supabase project connection plan.
 
 Exit criteria:
 
@@ -31,6 +32,7 @@ Deliverables:
 - Goal/timeline view.
 - Resume library page.
 - Approval inbox.
+- Connected accounts status page.
 
 Exit criteria:
 
@@ -67,7 +69,10 @@ Deliverables:
 - Dynamic onboarding UI.
 - Resume import.
 - GitHub/source setup prompts.
+- Calendar/email connection prompts.
+- Academic context setup.
 - Initial source monitor proposals.
+- Initial application status check policies.
 - Initial goal hierarchy.
 - Initial application strategy.
 
@@ -82,9 +87,11 @@ Deliverables:
 
 - SourceMonitor tables.
 - SourceRun tables.
+- ApplicationStatusCheck tables.
 - GitHub repo monitor support.
 - Company board monitor support.
 - Event source monitor support.
+- Email/calendar status signal support.
 - Source Adapter Builder agent.
 
 Exit criteria:
@@ -127,11 +134,8 @@ Deliverables:
 
 - Mentor Manager agent.
 - Event Scanner agent.
-- Calendar integration.
-- Email/application status integration.
 - GitHub activity signals.
 
 Exit criteria:
 
 - System can connect applications, events, contacts, and goals into concrete tasks.
-

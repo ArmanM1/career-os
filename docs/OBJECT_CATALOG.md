@@ -16,6 +16,9 @@ This file is intentionally broad. The next step is to approve, decline, or defer
 | `UserProfile` | core_v1 | Durable profile built from onboarding, resumes, check-ins, and activity. |
 | `Preference` | core_v1 | Role, company, work style, location, source, and communication preferences. |
 | `Constraint` | core_v1 | Time, school, geography, visa, budget, energy, and other constraints. |
+| `AcademicContext` | core_v1 | College year, current term, graduation date, school calendar, timezone, and recruiting season. |
+| `CalendarConstraint` | core_v1 | Busy windows, exams, travel, class schedule, deadlines, and event conflicts. |
+| `ConnectedAccount` | core_v1 | Enabled external accounts such as Gmail, Google Calendar, GitHub, and browser profile access. |
 | `Interest` | v1_candidate | Areas the user is curious about but not yet pursuing. |
 | `Avoidance` | v1_candidate | Tasks, roles, environments, or workflows the user tends to avoid. |
 | `Strength` | v1_candidate | Known advantages, skills, or traits to use in planning and resumes. |
@@ -57,6 +60,7 @@ This file is intentionally broad. The next step is to approve, decline, or defer
 | `Opportunity` | core_v1 | Job, internship, event, program, fellowship, competition, or other external opportunity. |
 | `Application` | core_v1 | Pipeline record for a specific opportunity. |
 | `ApplicationStatus` | core_v1 | found, interested, drafting, ready_to_submit, submitted, OA, interview, rejected, ghosted, offer, withdrawn. |
+| `ApplicationStatusCheck` | core_v1 | Scheduled or manual check that updates application status from email, portal, calendar, or user evidence. |
 | `Company` | core_v1 | Company profile, rank, relationship state, career relevance. |
 | `RoleTarget` | core_v1 | Target role type such as SWE intern, FDE, founder-facing engineer, consulting. |
 | `CompanyRanking` | core_v1 | User ranking or system ranking of companies. |
@@ -135,6 +139,8 @@ This file is intentionally broad. The next step is to approve, decline, or defer
 | `AvailabilityWindow` | v1_candidate | Time windows used for planning. |
 | `EmailThreadRef` | v1_candidate | Reference to email thread related to application/contact. |
 | `ApplicationEmailSignal` | v1_candidate | Parsed status or update from email. |
+| `ApplicationPortalRef` | v1_candidate | Link and metadata for a job portal where status can be checked. |
+| `AcademicCalendarEvent` | v1_candidate | Exams, breaks, recruiting fairs, and school-specific timeline events. |
 | `GitHubActivitySignal` | v1_candidate | Commits, repositories, or contribution activity. |
 | `ComputerUseSession` | later | Auditable session where agent operated local GUI/browser. |
 | `BrowserSessionArtifact` | later | Screenshot, extracted page, or result from browser use. |
@@ -193,4 +199,3 @@ Every object that appears in the UI should expose:
 - `updatedAt`
 
 The UI should not infer core meaning from unstructured agent prose.
-

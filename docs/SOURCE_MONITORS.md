@@ -30,6 +30,9 @@ Initial source types:
 - `social_account`
 - `community_page`
 - `manual_list`
+- `email_application_status`
+- `application_portal`
+- `calendar_events`
 
 ## Source Monitor Object
 
@@ -106,6 +109,27 @@ Event recommendations should include:
 - concrete next action
 - deadline/date
 
+## Application Status Checks
+
+Application status checks are scheduled monitors tied to active applications.
+
+Preferred check order:
+
+1. Gmail/email signal from the company or ATS.
+2. Calendar signal for OA, interview, deadline, or event.
+3. Application portal page.
+4. User manual status.
+5. Browser/computer use with approval.
+
+Status checks should update the `Application` only when there is evidence. Otherwise they should create a task or approval request.
+
+Examples:
+
+- email says rejected -> update application to `rejected` with evidence
+- email says interview invite -> update to `interview`, create scheduling/prep tasks
+- portal changed but confidence is low -> create approval request
+- no change after scheduled check -> record `no_change`, schedule next check
+
 ## Monitor Runs
 
 Every run should create a `SourceRun`:
@@ -135,6 +159,6 @@ Run AI when:
 - an opportunity may change the weekly plan
 - a source requires browser/computer use
 - a monitor produces unexpected output
+- an application status change needs interpretation
 
 Do not run AI just to poll a repository or fetch a known page.
-

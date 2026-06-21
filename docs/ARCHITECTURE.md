@@ -28,6 +28,8 @@ Phone/Desktop Browser
 
 The hosted database is the durable state layer. The local worker is the execution layer. Codex App Server is the first agent runtime.
 
+All agents should be aware of current date/time, the user's academic calendar, and where the user is in their college journey. This affects recruiting timelines, internship eligibility, event recommendations, task pacing, and goal horizons.
+
 ## Deployment Shape
 
 ### Web App
@@ -45,6 +47,7 @@ Responsibilities:
 - Source monitor management.
 - Approval inbox.
 - Audit log viewer.
+- Connected account status for calendar, email, GitHub, and future integrations.
 
 The web app reads and writes Supabase. It does not talk directly to Codex App Server.
 
@@ -71,6 +74,7 @@ Responsibilities:
 - Invoke skills.
 - Provide Career OS tools to agents.
 - Run deterministic source monitor scripts.
+- Run scheduled application status checks.
 - Clone and pull source repositories.
 - Generate or update parser scripts.
 - Manage local resume LaTeX files.
@@ -120,11 +124,14 @@ Career OS database is the source of truth.
 Codex threads are execution logs and context containers. They are not the canonical store for:
 
 - goals
+- academic profile and college journey
 - tasks
 - applications
+- application status checks
 - opportunities
 - mentors
 - events
+- calendar/email/activity references
 - resumes
 - source monitors
 - approvals
@@ -171,6 +178,7 @@ Auto-allowed candidates:
 - Update task priorities.
 - Add opportunities.
 - Update application metadata.
+- Update application status when verifiable from approved evidence.
 - Generate resume variants.
 - Draft outreach.
 - Build source monitor scripts.
@@ -188,6 +196,7 @@ Approval-required candidates:
 - Enable a new monitor that requires credentials.
 - Use full computer/browser control for authenticated websites.
 - Publish files outside configured folders.
+- Connect a new external account or expand connector permissions.
 
 Every approval request should include:
 
@@ -233,6 +242,7 @@ Inputs:
 - resumes
 - GitHub profile
 - calendar availability
+- academic year, expected graduation date, current term, school calendar, and recruiting season
 - email/application status access
 - existing projects
 - target roles
@@ -250,10 +260,13 @@ Outputs:
 - initial task dashboard
 - application strategy
 - source monitors to configure
+- application status monitors to configure
 - resume library baseline
 - check-in cadence
 
 Job search setup is part of onboarding.
+
+Calendar and email access should be treated as constraints and signal sources. Events, application deadlines, follow-ups, status checks, and weekly planning should use calendar/email context when the relevant connector is enabled.
 
 ### Job Search
 
@@ -270,6 +283,14 @@ Job search should find durable sources first:
 
 Agents should create source monitors when they find repeatable sources.
 
+Application status checking is part of job search. The system should schedule checks for each active application using the least invasive reliable source:
+
+1. application emails
+2. known application portal status pages
+3. calendar events related to OAs/interviews
+4. manually provided status
+5. browser/computer use with approval when no structured path exists
+
 ### Weekly Briefing
 
 Weekly briefing produces a dynamic plan.
@@ -278,13 +299,16 @@ Inputs:
 
 - active goals
 - timelines
+- academic timeline and current recruiting season
 - check-in data
 - task completion
 - applications
+- application status check results
 - new opportunities
 - mentor/contact state
 - events
 - calendar availability
+- email-derived deadlines and status signals
 - source monitor signals
 
 Outputs:
@@ -376,4 +400,3 @@ AI discovers source
 ```
 
 Codex App Server uses the user's local Codex/ChatGPT access. Hosted services should be limited to web UI and state.
-
