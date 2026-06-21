@@ -144,6 +144,11 @@ export const demoSourceMonitors: SourceMonitor[] = [
     fetchStrategy: "git_pull",
     schedule: "every_6_hours",
     requiresAuth: false,
+    browserUseEnabled: false,
+    lastSeenCursor: undefined,
+    lastSeenHash: undefined,
+    sourceRationale: "Structured public list suitable for deterministic GitHub parsing once activated.",
+    evaluation: {},
+    relatedCompanyIds: [],
   },
 ];
-

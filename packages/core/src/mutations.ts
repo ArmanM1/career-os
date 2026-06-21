@@ -2,6 +2,12 @@ import { z } from "zod";
 import { ProposedMutation, proposedMutationSchema } from "./schemas";
 
 export const safeAutoApplyMutationTypes = new Set([
+  "evidence.create",
+  "source_discovery_run.create",
+  "source_discovery_run.update",
+  "source_candidate.create",
+  "signal.create",
+  "opportunity_recommendation.create",
   "goal.create",
   "goal.update",
   "task.create",
@@ -11,6 +17,9 @@ export const safeAutoApplyMutationTypes = new Set([
   "application.create",
   "application.update_metadata",
   "source_monitor.create_proposal",
+  "source_monitor.update_metadata",
+  "source_monitor.update_health",
+  "agent_job.create",
   "resume_variant.create",
   "application_status_check.schedule",
   "application_status_check.record_result",
@@ -50,6 +59,10 @@ export function decideMutation(input: ProposedMutation): MutationDecision {
     return { action: "approval_required", mutation, reason: "Mutation type is not in the safe auto-apply allowlist." };
   }
 
+  if (mutation.mutationType === "source_monitor.create_proposal" && mutation.payload.status === "active") {
+    return { action: "approval_required", mutation, reason: "New source monitors must start as proposed." };
+  }
+
   if (mutation.mutationType === "application.update_status" && mutation.evidenceIds.length === 0) {
     return { action: "approval_required", mutation, reason: "Application status updates require evidence." };
   }
@@ -77,4 +90,3 @@ export function classifyMutations(mutations: ProposedMutation[]) {
 
   return mutationResultSchema.parse({ applied, approvalRequired, rejected });
 }
-

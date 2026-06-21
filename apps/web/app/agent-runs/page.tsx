@@ -3,6 +3,8 @@ import { ObjectCard } from "@/components/object-card";
 import { Panel } from "@/components/panel";
 import { getDashboardData } from "@/lib/data";
 
+export const dynamic = "force-dynamic";
+
 type AgentRunRow = { id: string; title?: string; status?: string; labels?: string[]; agent_id?: string };
 
 export default async function AgentRunsPage() {

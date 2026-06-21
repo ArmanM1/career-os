@@ -32,7 +32,8 @@ Primary output: `SourceMonitor` proposals, source health updates, parser build r
 The agent owns:
 
 - Finding new job, internship, fellowship, event, and program sources.
-- Searching GitHub, the web, known company systems, communities, newsletters, and approved social accounts.
+- Searching GitHub, the web, known company systems, communities, newsletters, X, Instagram, and approved social accounts.
+- Investigating user-provided accounts, handles, communities, or source hints.
 - Opening the user's browser or local computer session when a manual run or enabled source permits it.
 - Evaluating source quality, freshness, trust, relevance, parseability, and maintenance cost.
 - Creating `SourceMonitor` records for durable sources.
@@ -177,7 +178,7 @@ The Job Sourcing Agent should focus first on durable opportunity sources:
 3. School event and recruiting pages.
 4. Niche newsletters and communities.
 5. Target company lists.
-6. Approved social accounts.
+6. Approved social accounts, including X and Instagram accounts.
 
 ## Source Evaluation
 
@@ -427,12 +428,15 @@ Social accounts are valid sources when they repeatedly post useful opportunity s
 Examples:
 
 - zero2sudo Instagram.
+- X accounts that repeatedly post internships, fellowships, startup programs, hackathons, or niche recruiting drops.
 - Other creators who post internship drops, startup programs, hackathons, or fellowships.
 
 Social source rules:
 
 - Prefer public or structured alternatives when available.
 - Browser-backed monitoring is allowed when the source is configured or manually requested.
+- Discovery and inspection of social sources may remain agent/browser-led when deterministic parsing is not realistic.
+- The user can provide accounts or handles that the agent should inspect or use as starting points.
 - Store narrow artifacts tied to the opportunity signal, not broad browsing history.
 - The agent may screenshot relevant posts or stories for evidence.
 - The agent may not post or DM.

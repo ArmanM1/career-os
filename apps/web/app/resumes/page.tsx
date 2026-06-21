@@ -3,6 +3,8 @@ import { ObjectCard } from "@/components/object-card";
 import { Panel } from "@/components/panel";
 import { getDashboardData } from "@/lib/data";
 
+export const dynamic = "force-dynamic";
+
 type ResumeRow = {
   id: string;
   title: string;

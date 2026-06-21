@@ -1,6 +1,7 @@
 export type AgentId =
   | "career-advisor"
   | "career-onboarding"
+  | "career-positioning"
   | "career-job-sourcing"
   | "career-job-finder"
   | "career-opportunity-ranking"
@@ -35,6 +36,14 @@ export const agentDefinitions: AgentDefinition[] = [
     threadPolicy: "global",
     defaultQueue: "onboarding",
     description: "Builds profile, academic context, goals, source setup, and application strategy.",
+  },
+  {
+    id: "career-positioning",
+    displayName: "Positioning",
+    skillPath: ".agents/skills/career-positioning/SKILL.md",
+    threadPolicy: "global",
+    defaultQueue: "planning",
+    description: "Maintains time-aware long-term positioning, seasons, and strategic career direction.",
   },
   {
     id: "career-job-sourcing",

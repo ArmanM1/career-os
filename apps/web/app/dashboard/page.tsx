@@ -4,6 +4,8 @@ import { PageHeader } from "@/components/page-header";
 import { Panel } from "@/components/panel";
 import { getDashboardData } from "@/lib/data";
 
+export const dynamic = "force-dynamic";
+
 type DashboardRow = {
   id: string;
   title: string;

@@ -44,6 +44,20 @@ Thread policy:
 
 - Long-lived onboarding thread.
 
+### Positioning Agent
+
+Purpose:
+
+- Maintain long-term strategic positioning across career tracks.
+- Stay aware of date, academic year, recruiting season, graduation timeline, and market timing.
+- Add or update target seasons when new opportunity cycles begin to emerge.
+- Revisit role targets, source priorities, and allocation across SWE, FDE, entrepreneurship, and exploration.
+- Route tactical work to specialized agents rather than creating final todos directly.
+
+Thread policy:
+
+- Long-lived global thread.
+
 ### Job Sourcing Agent
 
 Purpose:
@@ -51,6 +65,8 @@ Purpose:
 - Find and maintain durable opportunity sources.
 - Set up source monitors during onboarding and scheduled discovery refreshes.
 - Prefer GitHub repos, company boards, school/event sources, niche lists, and relevant social/resource accounts over broad job boards.
+- Search X and Instagram when the run mode permits browser/computer use.
+- Use user-provided accounts, handles, and communities as source discovery hints.
 - Create source monitor proposals.
 - Trigger Source Adapter Builder jobs for sources that need parsers.
 - Support manual browser/computer-use discovery runs when the user kicks off a search.
@@ -196,6 +212,8 @@ Recommended repository layout:
   career-advisor/
     SKILL.md
   career-onboarding/
+    SKILL.md
+  career-positioning/
     SKILL.md
   career-job-sourcing/
     SKILL.md

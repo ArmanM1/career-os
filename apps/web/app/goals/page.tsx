@@ -3,6 +3,8 @@ import { ObjectCard } from "@/components/object-card";
 import { Panel } from "@/components/panel";
 import { getDashboardData } from "@/lib/data";
 
+export const dynamic = "force-dynamic";
+
 const horizons = ["long_term", "1_year", "90_day", "30_day", "week"];
 type GoalRow = { id: string; title: string; status?: string; labels?: string[]; horizon?: string; priority?: number };
 

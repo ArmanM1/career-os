@@ -2,6 +2,8 @@ import { PageHeader } from "@/components/page-header";
 import { ObjectCard } from "@/components/object-card";
 import { getDashboardData } from "@/lib/data";
 
+export const dynamic = "force-dynamic";
+
 const statuses = ["found", "interested", "drafting", "ready_to_submit", "submitted", "oa", "interview", "rejected", "ghosted", "offer", "withdrawn"];
 type ApplicationRow = { id: string; title: string; status?: string; labels?: string[]; priority?: number; due_at?: string };
 
