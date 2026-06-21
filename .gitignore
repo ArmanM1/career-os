@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build output
+.next/
+dist/
+build/
+out/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local databases and generated state
+*.sqlite
+*.sqlite3
+*.db
+.supabase/
+tmp/
+logs/
+*.log
+
+# Local agent/runtime artifacts
+.codex-local/
+.career-os-local/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
