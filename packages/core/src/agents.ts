@@ -3,7 +3,7 @@ export type AgentId =
   | "career-onboarding"
   | "career-job-sourcing"
   | "career-job-finder"
-  | "career-opportunity-recommender"
+  | "career-opportunity-ranking"
   | "career-weekly-planner"
   | "career-resume-tailor"
   | "career-source-adapter-builder"
@@ -53,12 +53,12 @@ export const agentDefinitions: AgentDefinition[] = [
     description: "Compatibility agent for job search flows that combine sourcing and opportunity creation.",
   },
   {
-    id: "career-opportunity-recommender",
-    displayName: "Opportunity Recommender",
-    skillPath: ".agents/skills/career-opportunity-recommender/SKILL.md",
+    id: "career-opportunity-ranking",
+    displayName: "Opportunity Ranking",
+    skillPath: ".agents/skills/career-opportunity-ranking/SKILL.md",
     threadPolicy: "global",
-    defaultQueue: "job-search",
-    description: "Dedupe and rank opportunity signals, then propose opportunities, applications, and tasks.",
+    defaultQueue: "opportunities",
+    description: "Dedupe and rank opportunity signals, then produce rich recommendations, planner hints, applications, and tasks.",
   },
   {
     id: "career-weekly-planner",

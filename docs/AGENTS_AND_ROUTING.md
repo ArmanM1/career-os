@@ -64,20 +64,25 @@ Spec:
 
 - See [Job Sourcing Agent Spec](JOB_SOURCING_AGENT_SPEC.md).
 
-### Opportunity Recommender Agent
+### Opportunity Ranking Agent
 
 Purpose:
 
 - Consume raw signals from source monitors.
 - Dedupe opportunities.
 - Rank opportunities against target roles, goals, constraints, and source quality.
+- Produce rich role briefs and planner hints for every actionable recommendation.
 - Create opportunity records, application candidates, and next-action tasks.
 - Configure scheduled application status checks when an application is created.
 
 Thread policy:
 
-- One global recommendation thread.
+- One global ranking thread.
 - Optional one thread per high-value source or opportunity cluster.
+
+Spec:
+
+- See [Opportunity Ranking Agent Spec](OPPORTUNITY_RANKING_AGENT_SPEC.md).
 
 ### Source Adapter Builder Agent
 
@@ -157,9 +162,10 @@ Buttons and pages should route deterministically:
 | Chat | Advisor |
 | Onboarding | Onboarding |
 | Weekly Briefing | Weekly Planner |
-| Find Jobs | Job Finder |
-| Application Status Check | Job Finder |
-| Source Monitor Setup | Job Finder or Source Adapter Builder |
+| Find Sources | Job Sourcing |
+| Rank Opportunities | Opportunity Ranking |
+| Application Status Check | Application status workflow |
+| Source Monitor Setup | Job Sourcing or Source Adapter Builder |
 | Resume Library | Resume Tailor |
 | Application Detail | Resume Tailor or Job Finder |
 | Mentors | Mentor Manager |
@@ -191,7 +197,9 @@ Recommended repository layout:
     SKILL.md
   career-onboarding/
     SKILL.md
-  career-job-finder/
+  career-job-sourcing/
+    SKILL.md
+  career-opportunity-ranking/
     SKILL.md
   career-source-adapter-builder/
     SKILL.md

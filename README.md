@@ -22,6 +22,7 @@ The project is not a generic career product. It is a personal operating system f
 - [Agents and routing](docs/AGENTS_AND_ROUTING.md)
 - [Source monitors and job search](docs/SOURCE_MONITORS.md)
 - [Job Sourcing agent spec](docs/JOB_SOURCING_AGENT_SPEC.md)
+- [Opportunity Ranking agent spec](docs/OPPORTUNITY_RANKING_AGENT_SPEC.md)
 - [Resume library](docs/RESUME_LIBRARY.md)
 - [Supabase setup](docs/SUPABASE_SETUP.md)
 - [Roadmap](docs/ROADMAP.md)

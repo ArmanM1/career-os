@@ -15,6 +15,8 @@ export const objectTypeSchema = z.enum([
   "goal",
   "task",
   "opportunity",
+  "opportunity_recommendation",
+  "opportunity_ranking_preference",
   "company",
   "role_target",
   "application",
@@ -147,6 +149,104 @@ export const opportunitySchema = careerObjectEnvelopeSchema.extend({
   fitRationale: z.string(),
 });
 
+export const opportunityRecommendationSchema = careerObjectEnvelopeSchema.extend({
+  objectType: z.literal("opportunity_recommendation"),
+  opportunityId: z.string().uuid().optional(),
+  sourceSignalIds: z.array(z.string().uuid()).default([]),
+  recommendation: z.enum([
+    "apply_now",
+    "prepare_then_apply",
+    "build_project_then_apply",
+    "research",
+    "save",
+    "ignore",
+    "needs_review",
+  ]),
+  score: z.number().min(0).max(100),
+  confidence: confidenceSchema,
+  aggressivenessUsed: z.enum(["conservative", "balanced", "high", "very_high"]),
+  roleBrief: z.object({
+    roleTitle: z.string(),
+    companyName: z.string().optional(),
+    opportunityType: z.string(),
+    oneLineSummary: z.string(),
+    roleDescription: z.string(),
+    whyItMatters: z.string(),
+    fitSummary: z.string(),
+    mainRequirements: z.array(z.string()).default([]),
+    matchingStrengths: z.array(z.string()).default([]),
+    gapsOrRisks: z.array(z.string()).default([]),
+    projectBridge: z.string().optional(),
+    resumeAngle: z.string(),
+    outreachAngle: z.string().optional(),
+    applicationComplexity: z.enum(["low", "medium", "high"]),
+    deadlineSummary: z.string().optional(),
+    sourceSummary: z.string(),
+  }),
+  scoreBreakdown: z.record(z.number()).default({}),
+  projectBridgeAssessment: z
+    .object({
+      bridgeable: z.boolean(),
+      confidence: confidenceSchema,
+      missingSignals: z.array(z.string()).default([]),
+      suggestedProject: z
+        .object({
+          title: z.string(),
+          description: z.string(),
+          targetSkills: z.array(z.string()).default([]),
+          estimatedDays: z.number().min(0),
+          minimumViableArtifact: z.string(),
+          resumeBulletAngle: z.string(),
+        })
+        .optional(),
+      impactOnRecommendation: z.string(),
+    })
+    .optional(),
+  suggestedTasks: z
+    .array(
+      z.object({
+        title: z.string(),
+        taskType: z.enum(["job_app", "mentor", "event", "resume", "project", "skill", "research", "admin"]),
+        effort: z.enum(["small", "medium", "large"]),
+        urgency: z.enum(["low", "normal", "high", "time_sensitive"]),
+        rationale: z.string(),
+      }),
+    )
+    .default([]),
+  plannerHints: z.object({
+    urgency: z.enum(["low", "normal", "high", "time_sensitive"]),
+    recommendedWindow: z.enum(["today", "this_week", "next_2_weeks", "later"]),
+    estimatedEffortHours: z.number().min(0),
+    prerequisites: z.array(z.string()).default([]),
+    suggestedSequence: z.array(z.string()).default([]),
+    deadlineAt: z.string().datetime().optional(),
+    mustDoBeforeApply: z.array(z.string()).default([]),
+    niceToHaveBeforeApply: z.array(z.string()).default([]),
+    calendarBlockSuggestion: z
+      .object({
+        title: z.string(),
+        durationMinutes: z.number().int().min(1),
+        energy: z.enum(["low", "medium", "high"]),
+      })
+      .optional(),
+  }),
+});
+
+export const opportunityRankingPreferenceSchema = careerObjectEnvelopeSchema.extend({
+  objectType: z.literal("opportunity_ranking_preference"),
+  aggressiveness: z.enum(["conservative", "balanced", "high", "very_high"]).default("high"),
+  assumeFastProjectBuild: z.boolean().default(true),
+  projectBuildWindowDays: z.number().int().min(0).default(3),
+  maxRecommendedApplyNowPerWeek: z.number().int().min(0).optional(),
+  minScoreForApplyNow: z.number().min(0).max(100).default(78),
+  minScoreForPrepareThenApply: z.number().min(0).max(100).default(62),
+  riskTolerance: z.enum(["low", "medium", "high"]).default("high"),
+  preferLearningStretch: z.boolean().default(true),
+  preferReferralLeverage: z.boolean().default(true),
+  preferFastApplications: z.boolean().default(false),
+  preferredTracks: z.array(z.string()).default([]),
+});
+
 export const applicationStatusCheckSchema = careerObjectEnvelopeSchema.extend({
   objectType: z.literal("application_status_check"),
   applicationId: z.string().uuid(),
@@ -252,9 +352,10 @@ export type Goal = z.infer<typeof goalSchema>;
 export type Task = z.infer<typeof taskSchema>;
 export type Application = z.infer<typeof applicationSchema>;
 export type Opportunity = z.infer<typeof opportunitySchema>;
+export type OpportunityRecommendation = z.infer<typeof opportunityRecommendationSchema>;
+export type OpportunityRankingPreference = z.infer<typeof opportunityRankingPreferenceSchema>;
 export type SourceMonitor = z.infer<typeof sourceMonitorSchema>;
 export type ResumeVariant = z.infer<typeof resumeVariantSchema>;
 export type ConnectedAccount = z.infer<typeof connectedAccountSchema>;
 export type ProposedMutation = z.infer<typeof proposedMutationSchema>;
 export type AgentOutput = z.infer<typeof agentOutputSchema>;
-

@@ -12,7 +12,7 @@ Job Sourcing Agent
   -> evaluates source quality
   -> creates or updates SourceMonitor records
   -> requests parser setup or repair
-  -> hands source output to Opportunity Recommender
+  -> hands source output to Opportunity Ranking
 ```
 
 ## Agent Identity
@@ -62,13 +62,13 @@ Sourcing finds "Summer 2027 internships repo"
   -> monitor emits raw signals
 ```
 
-### Opportunity Recommender
+### Opportunity Ranking Agent
 
-The Opportunity Recommender consumes structured source output and ranks individual opportunities.
+The Opportunity Ranking Agent consumes structured source output and ranks individual opportunities.
 
 ```text
 SourceMonitor run emits Signal rows
-  -> Opportunity Recommender dedupes and ranks
+  -> Opportunity Ranking Agent dedupes and ranks
   -> creates recommended Opportunity records and next-action tasks
 ```
 
@@ -575,7 +575,7 @@ When a source needs a parser, the Job Sourcing Agent should queue a Source Adapt
 }
 ```
 
-Parser output should be raw `Signal` records. The Opportunity Recommender decides which signals become `Opportunity` records.
+Parser output should be raw `Signal` records. The Opportunity Ranking Agent decides which signals become recommended `Opportunity` records.
 
 ## UI Requirements
 
@@ -673,4 +673,3 @@ The Job Sourcing Agent is working when:
 - Broken source detection.
 - Parser repair requests.
 - Source replacement recommendations.
-

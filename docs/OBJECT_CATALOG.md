@@ -58,12 +58,15 @@ This file is intentionally broad. The next step is to approve, decline, or defer
 | Object | Status | Purpose |
 | --- | --- | --- |
 | `Opportunity` | core_v1 | Job, internship, event, program, fellowship, competition, or other external opportunity. |
+| `OpportunityRecommendation` | core_v1 | Ranked recommendation with role brief, score breakdown, project bridge assessment, planner hints, and evidence. |
+| `OpportunityRankingPreference` | core_v1 | User-adjustable ranking settings such as aggressiveness, project-bridge assumptions, thresholds, and risk tolerance. |
 | `Application` | core_v1 | Pipeline record for a specific opportunity. |
 | `ApplicationStatus` | core_v1 | found, interested, drafting, ready_to_submit, submitted, OA, interview, rejected, ghosted, offer, withdrawn. |
 | `ApplicationStatusCheck` | core_v1 | Scheduled or manual check that updates application status from email, portal, calendar, or user evidence. |
 | `Company` | core_v1 | Company profile, rank, relationship state, career relevance. |
 | `RoleTarget` | core_v1 | Target role type such as SWE intern, FDE, founder-facing engineer, consulting. |
 | `CompanyRanking` | core_v1 | User ranking or system ranking of companies. |
+| `ProjectBridgeAssessment` | v1_candidate | Assessment of whether a quick project can bridge gaps for a high-value opportunity. |
 | `ApplicationRequirement` | v1_candidate | Required resume, questions, transcript, cover letter, deadline, referral. |
 | `ApplicationAnswerDraft` | v1_candidate | Draft response for application questions. |
 | `InterviewProcess` | later | Stages, prep material, expected timeline. |
