@@ -39,3 +39,5 @@ resumes/**/.compile/
 Thumbs.db
 .vscode/
 .idea/
+
+.vercel
