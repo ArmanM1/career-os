@@ -11,6 +11,9 @@ export async function POST(request: Request) {
   const admin = getSupabaseAdminClient();
   const { data: items, error } = await admin.from("notification_outbox").select("*").eq("user_id", device.userId).eq("status", "pending").lte("scheduled_for", new Date().toISOString()).order("scheduled_for").limit(10);
   if (error) return NextResponse.json({ error: "Unable to read notification outbox" }, { status: 500 });
+  if (!items?.length) return NextResponse.json({ checked: 0, sent: 0 });
+  const env = getServerEnv();
+  if (!env.RESEND_API_KEY || !env.RESEND_FROM_EMAIL) return NextResponse.json({ error: "Email notifications are not configured" }, { status: 503 });
   const resend = getResendClient();
   const from = requireServerSecret("RESEND_FROM_EMAIL");
   let sent = 0;

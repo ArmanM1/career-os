@@ -11,16 +11,34 @@ function Require-Command([string]$Name, [string]$Help) {
   if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) { throw "$Name is required. $Help" }
 }
 
+function Find-MiKTeXCommand([string]$Name) {
+  $command = Get-Command $Name -ErrorAction SilentlyContinue
+  if ($command) { return $command.Source }
+  $candidates = @(
+    (Join-Path $env:LOCALAPPDATA "Programs\MiKTeX\miktex\bin\x64\$Name.exe"),
+    (Join-Path $env:ProgramFiles "MiKTeX\miktex\bin\x64\$Name.exe"),
+    (Join-Path ${env:ProgramFiles(x86)} "MiKTeX\miktex\bin\x64\$Name.exe")
+  )
+  return $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+}
+
 Require-Command node "Install Node.js 24.13.1."
 Require-Command npm "Install npm with Node.js."
 Require-Command git "Install Git for Windows."
 Require-Command codex "Install and sign in to Codex CLI."
-Require-Command latexmk "Install MiKTeX and enable latexmk."
+$pdflatexPath = Find-MiKTeXCommand "pdflatex"
+if (-not $pdflatexPath) { throw "MiKTeX with pdflatex is required." }
+$latexBin = Split-Path -Parent $pdflatexPath
+$initexmfPath = Find-MiKTeXCommand "initexmf"
+if ($initexmfPath) {
+  & $initexmfPath --set-config-value='[MPM]AutoInstall=1'
+  if ($LASTEXITCODE -ne 0) { throw "Unable to enable automatic installation of required LaTeX packages." }
+}
 
 $nodeVersion = (& node --version).TrimStart("v")
 if ($nodeVersion -ne "24.13.1") { throw "Career OS requires Node 24.13.1; found $nodeVersion." }
 $codexVersion = (& codex --version).Trim()
-if ($codexVersion -ne "codex-cli 0.120.0") { throw "Career OS requires the tested Codex App Server protocol from codex-cli 0.120.0; found $codexVersion." }
+if ($codexVersion -ne "codex-cli 0.144.3") { throw "Career OS requires the tested Codex App Server protocol from codex-cli 0.144.3; found $codexVersion. Run npm install --global @openai/codex@0.144.3." }
 & codex login status | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "Codex CLI is installed but not authenticated. Run codex login first." }
 $chromeCandidates = @(
@@ -59,6 +77,9 @@ try {
 
 $env:CAREER_OS_GATEWAY_URL = $GatewayUrl.TrimEnd("/")
 $env:CAREER_OS_DATA_DIR = $InstallRoot
+$env:CAREER_OS_LATEX_ENGINE = "pdflatex"
+$env:CAREER_OS_LATEX_PATH = $pdflatexPath
+$env:PATH = "$latexBin;$env:PATH"
 Push-Location $sourceRoot
 try {
   & npm --workspace @career-os/worker run dev -- --pair $PairingCode
@@ -69,6 +90,9 @@ $runner = @"
 `$ErrorActionPreference = "Stop"
 `$env:CAREER_OS_GATEWAY_URL = "$($GatewayUrl.TrimEnd('/'))"
 `$env:CAREER_OS_DATA_DIR = "$InstallRoot"
+`$env:CAREER_OS_LATEX_ENGINE = "pdflatex"
+`$env:CAREER_OS_LATEX_PATH = "$pdflatexPath"
+`$env:PATH = "$latexBin;`$env:PATH"
 Set-Location -LiteralPath "$sourceRoot"
 & npm --workspace @career-os/worker run dev *>> "$(Join-Path $logsRoot 'worker.log')"
 "@

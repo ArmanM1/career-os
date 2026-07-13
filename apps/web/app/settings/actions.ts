@@ -24,6 +24,32 @@ export async function disconnectConnector(accountId: string) {
   revalidatePath("/settings");
 }
 
+export async function requestConnectorSync(accountId: string) {
+  const { supabase, user } = await requireUser();
+  const { data: account } = await supabase
+    .from("connected_accounts")
+    .select("id,provider,status")
+    .eq("id", accountId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!account || account.status !== "connected") throw new Error("Connected account is not available for sync");
+  await supabase
+    .from("connected_accounts")
+    .update({ last_synced_at: null, updated_by: "user" })
+    .eq("id", account.id)
+    .eq("user_id", user.id);
+  await supabase.from("audit_log_entries").insert({
+    user_id: user.id,
+    action_type: "connector.sync_requested",
+    target_object_type: "connected_account",
+    target_object_id: account.id,
+    summary: `${account.provider} sync requested`,
+    created_by: "user",
+    updated_by: "user",
+  });
+  revalidatePath("/settings");
+}
+
 export async function setNotificationPreference(category: string, enabled: boolean) {
   const { supabase, user } = await requireUser();
   await supabase.from("notification_preferences").upsert({ user_id: user.id, category, channel: "email", enabled, minimum_severity: "important", status: "active", created_by: "user", updated_by: "user" }, { onConflict: "user_id,category,channel" });

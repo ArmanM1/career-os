@@ -21,7 +21,7 @@ See [Product specification](docs/PRODUCT_SPEC.md), [implementation status](docs/
 
 ## Local development
 
-Requirements: Node 24.13.1, Docker Desktop, Supabase CLI, and (for the paired worker) Codex CLI, Chrome, and MiKTeX/`latexmk`.
+Requirements: Node 24.13.1, Docker Desktop, Supabase CLI, and (for the paired worker) Codex CLI 0.144.3, Chrome, and MiKTeX/`pdflatex`.
 
 ```bash
 npm ci

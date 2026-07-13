@@ -204,19 +204,10 @@ function resolveCodexCommand() {
 
   const npmRootResult = spawnSync("npm.cmd", ["root", "-g"], { encoding: "utf8" });
   const npmRoot = typeof npmRootResult.stdout === "string" ? npmRootResult.stdout.trim() : "";
-  const bundledExe = join(
-    npmRoot,
-    "@openai",
-    "codex",
-    "node_modules",
-    "@openai",
-    "codex-win32-x64",
-    "vendor",
-    "x86_64-pc-windows-msvc",
-    "codex",
-    "codex.exe",
-  );
-  if (existsSync(bundledExe)) return bundledExe;
+  const packageRoot = join(npmRoot, "@openai", "codex", "node_modules", "@openai", "codex-win32-x64", "vendor", "x86_64-pc-windows-msvc");
+  const bundledExecutables = [join(packageRoot, "bin", "codex.exe"), join(packageRoot, "codex", "codex.exe")];
+  const bundledExe = bundledExecutables.find(existsSync);
+  if (bundledExe) return bundledExe;
 
   const result = spawnSync("where.exe", ["codex"], { encoding: "utf8" });
   const paths = result.stdout
@@ -226,20 +217,9 @@ function resolveCodexCommand() {
 
   const cmdShim = paths.find((path) => path.toLowerCase().endsWith(".cmd"));
   if (cmdShim) {
-    const shimExe = join(
-      dirname(cmdShim),
-      "node_modules",
-      "@openai",
-      "codex",
-      "node_modules",
-      "@openai",
-      "codex-win32-x64",
-      "vendor",
-      "x86_64-pc-windows-msvc",
-      "codex",
-      "codex.exe",
-    );
-    if (existsSync(shimExe)) return shimExe;
+    const shimRoot = join(dirname(cmdShim), "node_modules", "@openai", "codex", "node_modules", "@openai", "codex-win32-x64", "vendor", "x86_64-pc-windows-msvc");
+    const shimExe = [join(shimRoot, "bin", "codex.exe"), join(shimRoot, "codex", "codex.exe")].find(existsSync);
+    if (shimExe) return shimExe;
   }
 
   return paths.find((path) => path.toLowerCase().endsWith(".cmd")) ?? paths.find((path) => path.toLowerCase().endsWith(".exe")) ?? paths[0] ?? "codex";

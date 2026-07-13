@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { isAbsolute, relative, resolve } from "node:path";
-import { AgentOutput, agentSchemas, getAgentContract, normalizeAgentId } from "@career-os/core";
-import { z } from "zod";
+import { AgentOutput, getAgentContract } from "@career-os/core";
 import { AppServerMessage, CodexAppServerClient } from "./codex-app-server-client";
 
 type JsonObject = Record<string, unknown>;
@@ -715,10 +714,24 @@ const agentOutputJsonSchema = {
   },
 };
 
+// OpenAI structured outputs cannot represent the free-form, typed mutation
+// payloads used by Career OS. Keep API-level structure strict by encoding the
+// already versioned Zod envelope as JSON, then validate the decoded value with
+// the owning agent contract before any mutation can be applied.
+const encodedAgentOutputJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["json"],
+  properties: {
+    json: { type: "string" },
+  },
+};
+
 function buildTurnPrompt(input: RunTurnInput) {
   return [
     "Run the selected Career OS agent turn.",
     "Return exactly one JSON object matching the supplied output schema. Do not wrap it in markdown fences.",
+    "The response envelope has exactly one field named json. Its value is a JSON-encoded string containing the complete Career OS output object (schemaVersion, summary, disposition, messageParts, proposedMutations, stateObservations, approvalRequests, evidence, followUpQuestions, warnings).",
     "Every proposed mutation id must be a UUID.",
     "Use canonical snake_case object types such as 'source_monitor', not UI names like 'SourceMonitor'.",
     "Use only mutation types registered for the selected agent contract.",
@@ -735,9 +748,8 @@ function turnTimeoutMs(context: JsonObject) {
   return Math.max(5, Math.min(minutes, 90)) * 60_000;
 }
 
-function outputSchemaForAgent(agentId: string) {
-  const normalized = normalizeAgentId(agentId);
-  return normalized ? z.toJSONSchema(agentSchemas[normalized].output) : agentOutputJsonSchema;
+function outputSchemaForAgent(_agentId: string) {
+  return encodedAgentOutputJsonSchema;
 }
 
 function codexModel() {
@@ -796,13 +808,23 @@ function parseAgentOutput(text: string): JsonObject {
   for (const candidate of candidates) {
     try {
       const parsed = JSON.parse(candidate) as unknown;
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return normalizeAgentOutput(parsed as JsonObject);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const decoded = decodeAgentOutputEnvelope(parsed as JsonObject);
+        return normalizeAgentOutput(decoded);
+      }
     } catch {
       // Try the next extraction strategy.
     }
   }
 
   throw new Error("Codex final message was not valid Career OS JSON.");
+}
+
+function decodeAgentOutputEnvelope(value: JsonObject) {
+  if (typeof value.json !== "string") return value;
+  const decoded = JSON.parse(value.json) as unknown;
+  if (!decoded || typeof decoded !== "object" || Array.isArray(decoded)) throw new Error("Career OS encoded output was not a JSON object.");
+  return decoded as JsonObject;
 }
 
 function normalizeAgentOutput(output: JsonObject) {

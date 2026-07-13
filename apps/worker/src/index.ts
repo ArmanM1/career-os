@@ -23,6 +23,7 @@ import {
 import { createRuntime, NeedsUserInputError } from "./runtime";
 import { runSourceAdapter } from "./source-adapters";
 import { materializeBrowserSourceSkill } from "./source-browser-skill";
+import { inspectLatexEngine } from "./latex-compiler";
 
 const capabilities = [
   "codex",
@@ -280,9 +281,12 @@ async function prepareJobExecution(job: ClaimedJob, repoRoot: string, dataDir: s
     if (scopedBrowserUrl) {
       try { browserAllowedOrigins = [new URL(scopedBrowserUrl).origin]; } catch { browserAllowedOrigins = []; }
     }
+    const cwd = resolve(dataDir, "workspace", "runs", job.id);
+    await mkdir(cwd, { recursive: true });
+    const relativeSkillPath = getAgentDefinition(job.agent_id)?.skillPath ?? "";
     return {
-      cwd: repoRoot,
-      skillPath: getAgentDefinition(job.agent_id)?.skillPath ?? "",
+      cwd,
+      skillPath: resolve(repoRoot, relativeSkillPath),
       browserAllowedOrigins,
       sourceSkillChecksum: null as string | null,
     };
@@ -327,18 +331,15 @@ async function collectHealth(repoRoot: string) {
     windowsHide: true,
     timeout: 10_000,
   });
-  const latex = spawnSync("latexmk", ["--version"], {
-    encoding: "utf8",
-    windowsHide: true,
-    timeout: 10_000,
-  });
+  const latex = inspectLatexEngine();
   return {
     codexAuthenticated: codex.status === 0,
     repoAvailable: existsSync(join(repoRoot, "package.json")),
     browserProfileAvailable: existsSync(
       join(process.env.LOCALAPPDATA ?? "", "CareerOS", "chrome-profile"),
     ),
-    latexAvailable: latex.status === 0,
+    latexAvailable: latex.available,
+    latexEngine: latex.engine.kind,
     codexError:
       codex.status === 0
         ? null
@@ -347,14 +348,7 @@ async function collectHealth(repoRoot: string) {
             codex.error?.message ||
             "Codex authentication check failed"
           ).slice(0, 500),
-    latexError:
-      latex.status === 0
-        ? null
-        : (
-            latex.stderr ||
-            latex.error?.message ||
-            "latexmk is unavailable"
-          ).slice(0, 500),
+    latexError: latex.available ? null : latex.error,
     platform: process.platform,
     node: process.version,
   };
