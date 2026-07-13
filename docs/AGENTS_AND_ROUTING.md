@@ -208,7 +208,7 @@ The backend should execute the route. The model can recommend routing, but the a
 Recommended repository layout:
 
 ```text
-.agents/skills/
+career-os-agents/skills/
   career-advisor/
     SKILL.md
   career-onboarding/

@@ -106,6 +106,27 @@ async function applySafeMutation(supabase: WorkerSupabase, context: RunContext, 
     case "evidence.create":
       await applyEvidenceCreate(supabase, context, mutation);
       break;
+    case "profile.upsert":
+      await applyProfileUpsert(supabase, context, mutation);
+      break;
+    case "academic_context.upsert":
+      await applyAcademicContextUpsert(supabase, context, mutation);
+      break;
+    case "constraint.create":
+      await applyConstraintCreate(supabase, context, mutation);
+      break;
+    case "company.create":
+      await applyCompanyCreate(supabase, context, mutation);
+      break;
+    case "role_target.create":
+      await applyRoleTargetCreate(supabase, context, mutation);
+      break;
+    case "goal.create":
+      await applyGoalCreate(supabase, context, mutation);
+      break;
+    case "goal.update":
+      await applyGoalUpdate(supabase, mutation);
+      break;
     case "source_discovery_run.create":
       await applySourceDiscoveryRunCreate(supabase, context, mutation);
       break;
@@ -134,11 +155,53 @@ async function applySafeMutation(supabase: WorkerSupabase, context: RunContext, 
     case "task.create":
       await applyTaskCreate(supabase, context, mutation);
       break;
+    case "task.update":
+      await applyTaskUpdate(supabase, mutation);
+      break;
+    case "task.complete":
+      await applyTaskComplete(supabase, mutation);
+      break;
     case "application.create":
       await applyApplicationCreate(supabase, context, mutation);
       break;
+    case "application.update_metadata":
+      await applyApplicationUpdateMetadata(supabase, mutation);
+      break;
     case "application_status_check.schedule":
       await applyApplicationStatusCheckSchedule(supabase, context, mutation);
+      break;
+    case "event.create":
+      await applyEventCreate(supabase, context, mutation);
+      break;
+    case "event.update":
+      await applyEventUpdate(supabase, mutation);
+      break;
+    case "contact.create":
+      await applyContactCreate(supabase, context, mutation);
+      break;
+    case "contact.update":
+      await applyContactUpdate(supabase, mutation);
+      break;
+    case "mentor_relationship.create":
+      await applyMentorRelationshipCreate(supabase, context, mutation);
+      break;
+    case "mentor_relationship.update":
+      await applyMentorRelationshipUpdate(supabase, mutation);
+      break;
+    case "resume_variant.create":
+      await applyResumeVariantCreate(supabase, context, mutation);
+      break;
+    case "resume_bullet.create":
+      await applyResumeBulletCreate(supabase, context, mutation);
+      break;
+    case "experience.create":
+      await applyExperienceCreate(supabase, context, mutation);
+      break;
+    case "project.create":
+      await applyProjectCreate(supabase, context, mutation);
+      break;
+    case "skill.create":
+      await applySkillCreate(supabase, context, mutation);
       break;
     case "agent_job.create":
       await applyAgentJobCreate(supabase, context, mutation);
@@ -175,6 +238,150 @@ async function applyEvidenceCreate(supabase: WorkerSupabase, context: RunContext
     excerpt: optionalText(payload, "excerpt"),
     payload: record(payload, "payload"),
     created_by: "agent",
+    updated_by: "agent",
+  });
+}
+
+async function applyProfileUpsert(supabase: WorkerSupabase, context: RunContext, mutation: ProposedMutation) {
+  const payload = mutation.payload;
+  await upsertRow(supabase, "profiles", {
+    id: optionalText(payload, "id"),
+    user_id: context.userId,
+    title: text(payload, "title", "Profile"),
+    status: text(payload, "status", "active"),
+    labels: stringArray(payload, "labels"),
+    full_name: optionalText(payload, "fullName"),
+    headline: optionalText(payload, "headline"),
+    timezone: text(payload, "timezone", "America/Denver"),
+    metadata: record(payload, "metadata"),
+    created_by: "agent",
+    updated_by: "agent",
+  }, "user_id");
+}
+
+async function applyAcademicContextUpsert(supabase: WorkerSupabase, context: RunContext, mutation: ProposedMutation) {
+  const payload = mutation.payload;
+  const row = {
+    user_id: context.userId,
+    title: text(payload, "title", "Academic Context"),
+    status: text(payload, "status", "active"),
+    labels: stringArray(payload, "labels"),
+    institution: optionalText(payload, "institution"),
+    degree_program: optionalText(payload, "degreeProgram"),
+    current_year: optionalText(payload, "currentYear"),
+    current_term: optionalText(payload, "currentTerm"),
+    expected_graduation_date: optionalText(payload, "expectedGraduationDate"),
+    recruiting_season: optionalText(payload, "recruitingSeason"),
+    term_start_date: optionalText(payload, "termStartDate"),
+    term_end_date: optionalText(payload, "termEndDate"),
+    timezone: text(payload, "timezone", "America/Denver"),
+    metadata: record(payload, "metadata"),
+    created_by: "agent",
+    updated_by: "agent",
+  };
+
+  const id = optionalText(payload, "id") ?? mutation.targetObjectId;
+  if (id) {
+    await updateRow(supabase, "academic_contexts", id, row);
+    return;
+  }
+
+  await insertRow(supabase, "academic_contexts", { id: optionalText(payload, "id"), ...row });
+}
+
+async function applyConstraintCreate(supabase: WorkerSupabase, context: RunContext, mutation: ProposedMutation) {
+  const payload = mutation.payload;
+  await insertRow(supabase, "constraints", {
+    id: optionalText(payload, "id"),
+    user_id: context.userId,
+    title: requiredText(payload, "title", "Constraint"),
+    status: text(payload, "status", "active"),
+    labels: stringArray(payload, "labels"),
+    constraint_type: requiredText(payload, "constraintType", "preference"),
+    severity: text(payload, "severity", "soft"),
+    starts_at: optionalText(payload, "startsAt"),
+    ends_at: optionalText(payload, "endsAt"),
+    source: text(payload, "source", "agent"),
+    details: text(payload, "details", mutation.rationale),
+    metadata: record(payload, "metadata"),
+    created_by: "agent",
+    updated_by: "agent",
+  });
+}
+
+async function applyCompanyCreate(supabase: WorkerSupabase, context: RunContext, mutation: ProposedMutation) {
+  const payload = mutation.payload;
+  await insertRow(supabase, "companies", {
+    id: optionalText(payload, "id"),
+    user_id: context.userId,
+    title: requiredText(payload, "title", "Company"),
+    status: text(payload, "status", "active"),
+    labels: stringArray(payload, "labels"),
+    website_url: optionalText(payload, "websiteUrl"),
+    ranking: optionalNumber(payload, "ranking"),
+    metadata: record(payload, "metadata"),
+    created_by: "agent",
+    updated_by: "agent",
+  });
+}
+
+async function applyRoleTargetCreate(supabase: WorkerSupabase, context: RunContext, mutation: ProposedMutation) {
+  const payload = mutation.payload;
+  await insertRow(supabase, "role_targets", {
+    id: optionalText(payload, "id"),
+    user_id: context.userId,
+    title: requiredText(payload, "title", "Role target"),
+    status: text(payload, "status", "active"),
+    labels: stringArray(payload, "labels"),
+    track: text(payload, "track", "general"),
+    metadata: record(payload, "metadata"),
+    created_by: "agent",
+    updated_by: "agent",
+  });
+}
+
+async function applyGoalCreate(supabase: WorkerSupabase, context: RunContext, mutation: ProposedMutation) {
+  const payload = mutation.payload;
+  await insertRow(supabase, "goals", {
+    id: optionalText(payload, "id"),
+    user_id: context.userId,
+    title: requiredText(payload, "title", "Goal"),
+    status: text(payload, "status", "active"),
+    labels: stringArray(payload, "labels"),
+    priority: optionalNumber(payload, "priority"),
+    due_at: optionalText(payload, "dueAt"),
+    horizon: requiredText(payload, "horizon", "week"),
+    track: text(payload, "track", "general"),
+    parent_goal_id: optionalText(payload, "parentGoalId"),
+    target_date: optionalText(payload, "targetDate"),
+    allocation_percent: optionalNumber(payload, "allocationPercent"),
+    rationale: text(payload, "rationale", mutation.rationale),
+    related_goal_ids: stringArray(payload, "relatedGoalIds"),
+    evidence_ids: mutation.evidenceIds,
+    metadata: record(payload, "metadata"),
+    created_by: "agent",
+    updated_by: "agent",
+  });
+}
+
+async function applyGoalUpdate(supabase: WorkerSupabase, mutation: ProposedMutation) {
+  if (!mutation.targetObjectId) return;
+  const payload = mutation.payload;
+  await updateRow(supabase, "goals", mutation.targetObjectId, {
+    title: optionalText(payload, "title"),
+    status: optionalText(payload, "status"),
+    labels: optionalStringArray(payload, "labels"),
+    priority: optionalNumber(payload, "priority"),
+    due_at: optionalText(payload, "dueAt"),
+    horizon: optionalText(payload, "horizon"),
+    track: optionalText(payload, "track"),
+    parent_goal_id: optionalText(payload, "parentGoalId"),
+    target_date: optionalText(payload, "targetDate"),
+    allocation_percent: optionalNumber(payload, "allocationPercent"),
+    rationale: optionalText(payload, "rationale"),
+    related_goal_ids: optionalStringArray(payload, "relatedGoalIds"),
+    evidence_ids: optionalStringArray(payload, "evidenceIds"),
+    metadata: optionalRecord(payload, "metadata"),
     updated_by: "agent",
   });
 }
@@ -441,6 +648,43 @@ async function applyTaskCreate(supabase: WorkerSupabase, context: RunContext, mu
   });
 }
 
+async function applyTaskUpdate(supabase: WorkerSupabase, mutation: ProposedMutation) {
+  if (!mutation.targetObjectId) return;
+  const payload = mutation.payload;
+  await updateRow(supabase, "tasks", mutation.targetObjectId, {
+    title: optionalText(payload, "title"),
+    status: optionalText(payload, "status"),
+    labels: optionalStringArray(payload, "labels"),
+    priority: optionalNumber(payload, "priority"),
+    due_at: optionalText(payload, "dueAt"),
+    task_type: optionalText(payload, "taskType"),
+    effort: optionalText(payload, "effort"),
+    urgency: optionalText(payload, "urgency"),
+    energy: optionalText(payload, "energy"),
+    completion_notes: optionalText(payload, "completionNotes"),
+    related_goal_ids: optionalStringArray(payload, "relatedGoalIds"),
+    related_application_ids: optionalStringArray(payload, "relatedApplicationIds"),
+    related_opportunity_ids: optionalStringArray(payload, "relatedOpportunityIds"),
+    related_contact_ids: optionalStringArray(payload, "relatedContactIds"),
+    related_event_ids: optionalStringArray(payload, "relatedEventIds"),
+    evidence_ids: optionalStringArray(payload, "evidenceIds"),
+    metadata: optionalRecord(payload, "metadata"),
+    updated_by: "agent",
+  });
+}
+
+async function applyTaskComplete(supabase: WorkerSupabase, mutation: ProposedMutation) {
+  if (!mutation.targetObjectId) return;
+  const payload = mutation.payload;
+  await updateRow(supabase, "tasks", mutation.targetObjectId, {
+    status: text(payload, "status", "done"),
+    completion_notes: optionalText(payload, "completionNotes"),
+    evidence_ids: optionalStringArray(payload, "evidenceIds"),
+    metadata: optionalRecord(payload, "metadata"),
+    updated_by: "agent",
+  });
+}
+
 async function applyApplicationCreate(supabase: WorkerSupabase, context: RunContext, mutation: ProposedMutation) {
   const payload = mutation.payload;
   await insertRow(supabase, "applications", {
@@ -468,6 +712,28 @@ async function applyApplicationCreate(supabase: WorkerSupabase, context: RunCont
   });
 }
 
+async function applyApplicationUpdateMetadata(supabase: WorkerSupabase, mutation: ProposedMutation) {
+  if (!mutation.targetObjectId) return;
+  const payload = mutation.payload;
+  await updateRow(supabase, "applications", mutation.targetObjectId, {
+    title: optionalText(payload, "title"),
+    labels: optionalStringArray(payload, "labels"),
+    priority: optionalNumber(payload, "priority"),
+    due_at: optionalText(payload, "dueAt"),
+    deadline_at: optionalText(payload, "deadlineAt"),
+    resume_variant_id: optionalText(payload, "resumeVariantId"),
+    next_action_task_id: optionalText(payload, "nextActionTaskId"),
+    status_check_policy: optionalText(payload, "statusCheckPolicy"),
+    next_status_check_at: optionalText(payload, "nextStatusCheckAt"),
+    related_goal_ids: optionalStringArray(payload, "relatedGoalIds"),
+    related_opportunity_ids: optionalStringArray(payload, "relatedOpportunityIds"),
+    related_contact_ids: optionalStringArray(payload, "relatedContactIds"),
+    evidence_ids: optionalStringArray(payload, "evidenceIds"),
+    metadata: optionalRecord(payload, "metadata"),
+    updated_by: "agent",
+  });
+}
+
 async function applyApplicationStatusCheckSchedule(supabase: WorkerSupabase, context: RunContext, mutation: ProposedMutation) {
   const payload = mutation.payload;
   await insertRow(supabase, "application_status_checks", {
@@ -479,6 +745,207 @@ async function applyApplicationStatusCheckSchedule(supabase: WorkerSupabase, con
     application_id: requiredText(payload, "applicationId", ""),
     check_source: requiredText(payload, "checkSource", "manual"),
     scheduled_for: requiredText(payload, "scheduledFor", new Date().toISOString()),
+    evidence_ids: mutation.evidenceIds,
+    metadata: record(payload, "metadata"),
+    created_by: "agent",
+    updated_by: "agent",
+  });
+}
+
+async function applyEventCreate(supabase: WorkerSupabase, context: RunContext, mutation: ProposedMutation) {
+  const payload = mutation.payload;
+  await insertRow(supabase, "events", {
+    id: optionalText(payload, "id"),
+    user_id: context.userId,
+    title: requiredText(payload, "title", "Event"),
+    status: text(payload, "status", "active"),
+    labels: stringArray(payload, "labels"),
+    starts_at: optionalText(payload, "startsAt"),
+    ends_at: optionalText(payload, "endsAt"),
+    url: optionalText(payload, "url"),
+    location: optionalText(payload, "location"),
+    related_goal_ids: stringArray(payload, "relatedGoalIds"),
+    related_application_ids: stringArray(payload, "relatedApplicationIds"),
+    related_company_ids: stringArray(payload, "relatedCompanyIds"),
+    evidence_ids: mutation.evidenceIds,
+    metadata: record(payload, "metadata"),
+    created_by: "agent",
+    updated_by: "agent",
+  });
+}
+
+async function applyEventUpdate(supabase: WorkerSupabase, mutation: ProposedMutation) {
+  if (!mutation.targetObjectId) return;
+  const payload = mutation.payload;
+  await updateRow(supabase, "events", mutation.targetObjectId, {
+    title: optionalText(payload, "title"),
+    status: optionalText(payload, "status"),
+    labels: optionalStringArray(payload, "labels"),
+    starts_at: optionalText(payload, "startsAt"),
+    ends_at: optionalText(payload, "endsAt"),
+    url: optionalText(payload, "url"),
+    location: optionalText(payload, "location"),
+    related_goal_ids: optionalStringArray(payload, "relatedGoalIds"),
+    related_application_ids: optionalStringArray(payload, "relatedApplicationIds"),
+    related_company_ids: optionalStringArray(payload, "relatedCompanyIds"),
+    evidence_ids: optionalStringArray(payload, "evidenceIds"),
+    metadata: optionalRecord(payload, "metadata"),
+    updated_by: "agent",
+  });
+}
+
+async function applyContactCreate(supabase: WorkerSupabase, context: RunContext, mutation: ProposedMutation) {
+  const payload = mutation.payload;
+  await insertRow(supabase, "contacts", {
+    id: optionalText(payload, "id"),
+    user_id: context.userId,
+    title: requiredText(payload, "title", "Contact"),
+    status: text(payload, "status", "active"),
+    labels: stringArray(payload, "labels"),
+    email: optionalText(payload, "email"),
+    company_id: optionalText(payload, "companyId"),
+    role_title: optionalText(payload, "roleTitle"),
+    metadata: record(payload, "metadata"),
+    created_by: "agent",
+    updated_by: "agent",
+  });
+}
+
+async function applyContactUpdate(supabase: WorkerSupabase, mutation: ProposedMutation) {
+  if (!mutation.targetObjectId) return;
+  const payload = mutation.payload;
+  await updateRow(supabase, "contacts", mutation.targetObjectId, {
+    title: optionalText(payload, "title"),
+    status: optionalText(payload, "status"),
+    labels: optionalStringArray(payload, "labels"),
+    email: optionalText(payload, "email"),
+    company_id: optionalText(payload, "companyId"),
+    role_title: optionalText(payload, "roleTitle"),
+    metadata: optionalRecord(payload, "metadata"),
+    updated_by: "agent",
+  });
+}
+
+async function applyMentorRelationshipCreate(supabase: WorkerSupabase, context: RunContext, mutation: ProposedMutation) {
+  const payload = mutation.payload;
+  await insertRow(supabase, "mentor_relationships", {
+    id: optionalText(payload, "id"),
+    user_id: context.userId,
+    contact_id: optionalText(payload, "contactId"),
+    title: requiredText(payload, "title", "Mentor relationship"),
+    status: text(payload, "status", "active"),
+    labels: stringArray(payload, "labels"),
+    cadence: optionalText(payload, "cadence"),
+    last_interaction_at: optionalText(payload, "lastInteractionAt"),
+    next_follow_up_at: optionalText(payload, "nextFollowUpAt"),
+    metadata: record(payload, "metadata"),
+    created_by: "agent",
+    updated_by: "agent",
+  });
+}
+
+async function applyMentorRelationshipUpdate(supabase: WorkerSupabase, mutation: ProposedMutation) {
+  if (!mutation.targetObjectId) return;
+  const payload = mutation.payload;
+  await updateRow(supabase, "mentor_relationships", mutation.targetObjectId, {
+    contact_id: optionalText(payload, "contactId"),
+    title: optionalText(payload, "title"),
+    status: optionalText(payload, "status"),
+    labels: optionalStringArray(payload, "labels"),
+    cadence: optionalText(payload, "cadence"),
+    last_interaction_at: optionalText(payload, "lastInteractionAt"),
+    next_follow_up_at: optionalText(payload, "nextFollowUpAt"),
+    metadata: optionalRecord(payload, "metadata"),
+    updated_by: "agent",
+  });
+}
+
+async function applyResumeVariantCreate(supabase: WorkerSupabase, context: RunContext, mutation: ProposedMutation) {
+  const payload = mutation.payload;
+  await insertRow(supabase, "resume_variants", {
+    id: optionalText(payload, "id"),
+    user_id: context.userId,
+    title: requiredText(payload, "title", "Resume variant"),
+    status: text(payload, "status", "draft"),
+    labels: stringArray(payload, "labels"),
+    base_version_id: optionalText(payload, "baseVersionId"),
+    application_id: optionalText(payload, "applicationId"),
+    company_id: optionalText(payload, "companyId"),
+    role_target_id: optionalText(payload, "roleTargetId"),
+    latex_path: requiredText(payload, "latexPath", "resumes/variants/draft.tex"),
+    pdf_path: optionalText(payload, "pdfPath"),
+    diff_path: optionalText(payload, "diffPath"),
+    rationale: text(payload, "rationale", mutation.rationale),
+    evidence_ids: mutation.evidenceIds,
+    metadata: record(payload, "metadata"),
+    created_by: "agent",
+    updated_by: "agent",
+  });
+}
+
+async function applyResumeBulletCreate(supabase: WorkerSupabase, context: RunContext, mutation: ProposedMutation) {
+  const payload = mutation.payload;
+  await insertRow(supabase, "resume_bullets", {
+    id: optionalText(payload, "id"),
+    user_id: context.userId,
+    title: requiredText(payload, "title", "Resume bullet"),
+    status: text(payload, "status", "active"),
+    labels: stringArray(payload, "labels"),
+    text: requiredText(payload, "text", ""),
+    metrics: stringArray(payload, "metrics"),
+    target_roles: stringArray(payload, "targetRoles"),
+    experience_id: optionalText(payload, "experienceId"),
+    metadata: record(payload, "metadata"),
+    created_by: "agent",
+    updated_by: "agent",
+  });
+}
+
+async function applyExperienceCreate(supabase: WorkerSupabase, context: RunContext, mutation: ProposedMutation) {
+  const payload = mutation.payload;
+  await insertRow(supabase, "experiences", {
+    id: optionalText(payload, "id"),
+    user_id: context.userId,
+    title: requiredText(payload, "title", "Experience"),
+    status: text(payload, "status", "active"),
+    labels: stringArray(payload, "labels"),
+    organization: optionalText(payload, "organization"),
+    starts_at: optionalText(payload, "startsAt"),
+    ends_at: optionalText(payload, "endsAt"),
+    description: optionalText(payload, "description"),
+    metadata: record(payload, "metadata"),
+    created_by: "agent",
+    updated_by: "agent",
+  });
+}
+
+async function applyProjectCreate(supabase: WorkerSupabase, context: RunContext, mutation: ProposedMutation) {
+  const payload = mutation.payload;
+  await insertRow(supabase, "projects", {
+    id: optionalText(payload, "id"),
+    user_id: context.userId,
+    title: requiredText(payload, "title", "Project"),
+    status: text(payload, "status", "active"),
+    labels: stringArray(payload, "labels"),
+    url: optionalText(payload, "url"),
+    repository_url: optionalText(payload, "repositoryUrl"),
+    description: optionalText(payload, "description"),
+    related_goal_ids: stringArray(payload, "relatedGoalIds"),
+    metadata: record(payload, "metadata"),
+    created_by: "agent",
+    updated_by: "agent",
+  });
+}
+
+async function applySkillCreate(supabase: WorkerSupabase, context: RunContext, mutation: ProposedMutation) {
+  const payload = mutation.payload;
+  await insertRow(supabase, "skills", {
+    id: optionalText(payload, "id"),
+    user_id: context.userId,
+    title: requiredText(payload, "title", "Skill"),
+    status: text(payload, "status", "active"),
+    labels: stringArray(payload, "labels"),
+    proficiency: optionalText(payload, "proficiency"),
     evidence_ids: mutation.evidenceIds,
     metadata: record(payload, "metadata"),
     created_by: "agent",
@@ -585,6 +1052,12 @@ function bool(payload: Payload, key: string, fallback: boolean) {
 function stringArray(payload: Payload, key: string) {
   const raw = payload[key] ?? payload[toSnake(key)];
   if (!Array.isArray(raw)) return [];
+  return raw.filter((item): item is string => typeof item === "string" && item.length > 0);
+}
+
+function optionalStringArray(payload: Payload, key: string) {
+  const raw = payload[key] ?? payload[toSnake(key)];
+  if (!Array.isArray(raw)) return undefined;
   return raw.filter((item): item is string => typeof item === "string" && item.length > 0);
 }
 

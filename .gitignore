@@ -27,6 +27,7 @@ logs/
 # Local agent/runtime artifacts
 .codex-local/
 .career-os-local/
+.playwright-mcp/
 resumes/**/*.pdf
 resumes/**/.compile/
 

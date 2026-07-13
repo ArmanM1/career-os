@@ -24,7 +24,7 @@ export const agentDefinitions: AgentDefinition[] = [
   {
     id: "career-advisor",
     displayName: "Advisor",
-    skillPath: ".agents/skills/career-advisor/SKILL.md",
+    skillPath: "career-os-agents/skills/career-advisor/SKILL.md",
     threadPolicy: "global",
     defaultQueue: "advisor",
     description: "Main chat router and explainer.",
@@ -32,7 +32,7 @@ export const agentDefinitions: AgentDefinition[] = [
   {
     id: "career-onboarding",
     displayName: "Onboarding",
-    skillPath: ".agents/skills/career-onboarding/SKILL.md",
+    skillPath: "career-os-agents/skills/career-onboarding/SKILL.md",
     threadPolicy: "global",
     defaultQueue: "onboarding",
     description: "Builds profile, academic context, goals, source setup, and application strategy.",
@@ -40,7 +40,7 @@ export const agentDefinitions: AgentDefinition[] = [
   {
     id: "career-positioning",
     displayName: "Positioning",
-    skillPath: ".agents/skills/career-positioning/SKILL.md",
+    skillPath: "career-os-agents/skills/career-positioning/SKILL.md",
     threadPolicy: "global",
     defaultQueue: "planning",
     description: "Maintains time-aware long-term positioning, seasons, and strategic career direction.",
@@ -48,7 +48,7 @@ export const agentDefinitions: AgentDefinition[] = [
   {
     id: "career-job-sourcing",
     displayName: "Job Sourcing",
-    skillPath: ".agents/skills/career-job-sourcing/SKILL.md",
+    skillPath: "career-os-agents/skills/career-job-sourcing/SKILL.md",
     threadPolicy: "per_source",
     defaultQueue: "sources",
     description: "Finds and maintains durable opportunity sources and source monitor proposals.",
@@ -56,7 +56,7 @@ export const agentDefinitions: AgentDefinition[] = [
   {
     id: "career-job-finder",
     displayName: "Job Finder",
-    skillPath: ".agents/skills/career-job-finder/SKILL.md",
+    skillPath: "career-os-agents/skills/career-job-finder/SKILL.md",
     threadPolicy: "per_source",
     defaultQueue: "job-search",
     description: "Compatibility agent for job search flows that combine sourcing and opportunity creation.",
@@ -64,7 +64,7 @@ export const agentDefinitions: AgentDefinition[] = [
   {
     id: "career-opportunity-ranking",
     displayName: "Opportunity Ranking",
-    skillPath: ".agents/skills/career-opportunity-ranking/SKILL.md",
+    skillPath: "career-os-agents/skills/career-opportunity-ranking/SKILL.md",
     threadPolicy: "global",
     defaultQueue: "opportunities",
     description: "Dedupe and rank opportunity signals, then produce rich recommendations, planner hints, applications, and tasks.",
@@ -72,7 +72,7 @@ export const agentDefinitions: AgentDefinition[] = [
   {
     id: "career-weekly-planner",
     displayName: "Weekly Planner",
-    skillPath: ".agents/skills/career-weekly-planner/SKILL.md",
+    skillPath: "career-os-agents/skills/career-weekly-planner/SKILL.md",
     threadPolicy: "per_week",
     defaultQueue: "planning",
     description: "Reprioritizes tasks from goals, applications, events, check-ins, and signals.",
@@ -80,7 +80,7 @@ export const agentDefinitions: AgentDefinition[] = [
   {
     id: "career-resume-tailor",
     displayName: "Resume Tailor",
-    skillPath: ".agents/skills/career-resume-tailor/SKILL.md",
+    skillPath: "career-os-agents/skills/career-resume-tailor/SKILL.md",
     threadPolicy: "per_resume",
     defaultQueue: "resume",
     description: "Creates resume variant proposals and metadata.",
@@ -88,7 +88,7 @@ export const agentDefinitions: AgentDefinition[] = [
   {
     id: "career-source-adapter-builder",
     displayName: "Source Adapter Builder",
-    skillPath: ".agents/skills/career-source-adapter-builder/SKILL.md",
+    skillPath: "career-os-agents/skills/career-source-adapter-builder/SKILL.md",
     threadPolicy: "per_source",
     defaultQueue: "sources",
     description: "Builds deterministic monitor scripts.",
@@ -96,7 +96,7 @@ export const agentDefinitions: AgentDefinition[] = [
   {
     id: "career-event-scanner",
     displayName: "Event Scanner",
-    skillPath: ".agents/skills/career-event-scanner/SKILL.md",
+    skillPath: "career-os-agents/skills/career-event-scanner/SKILL.md",
     threadPolicy: "per_event",
     defaultQueue: "events",
     description: "Finds events tied to goals, applications, and companies.",
@@ -104,7 +104,7 @@ export const agentDefinitions: AgentDefinition[] = [
   {
     id: "career-mentor-manager",
     displayName: "Mentor Manager",
-    skillPath: ".agents/skills/career-mentor-manager/SKILL.md",
+    skillPath: "career-os-agents/skills/career-mentor-manager/SKILL.md",
     threadPolicy: "per_contact",
     defaultQueue: "mentors",
     description: "Tracks contacts and follow-ups.",
