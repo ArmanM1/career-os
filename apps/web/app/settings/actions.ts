@@ -50,6 +50,66 @@ export async function requestConnectorSync(accountId: string) {
   revalidatePath("/settings");
 }
 
+export async function requestDataExport() {
+  const { supabase, user } = await requireUser();
+  const { data: pending } = await supabase
+    .from("approval_requests")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("action_type", "sensitive_data.export.request")
+    .eq("status", "pending")
+    .maybeSingle();
+  if (!pending) {
+    await supabase.from("approval_requests").insert({
+      user_id: user.id,
+      title: "Export Career OS data",
+      status: "pending",
+      action_type: "sensitive_data.export.request",
+      target_object_type: "profile",
+      target_object_id: user.id,
+      rationale: "Create a private JSON export of canonical Career OS data. OAuth tokens, device secrets, and pairing codes are excluded.",
+      risk_level: "medium",
+      payload: { format: "json", includeRawEvidence: false },
+      expires_at: new Date(Date.now() + 24 * 60 * 60_000).toISOString(),
+      created_by: "user",
+      updated_by: "user",
+    });
+  }
+  revalidatePath("/settings");
+  revalidatePath("/approvals");
+}
+
+export async function requestAccountDeletion(formData: FormData) {
+  const confirmation = String(formData.get("confirmation") ?? "").trim();
+  if (confirmation !== "DELETE MY CAREER OS DATA") throw new Error("Type the exact confirmation phrase before requesting deletion.");
+  const { supabase, user } = await requireUser();
+  const { data: pending } = await supabase
+    .from("approval_requests")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("action_type", "sensitive_data.delete.request")
+    .eq("status", "pending")
+    .maybeSingle();
+  if (!pending) {
+    await supabase.from("approval_requests").insert({
+      user_id: user.id,
+      title: "Permanently delete Career OS account data",
+      status: "pending",
+      action_type: "sensitive_data.delete.request",
+      target_object_type: "profile",
+      target_object_id: user.id,
+      rationale: "Delete the account, canonical database rows, private files, connector credentials, and paired device secrets. This cannot be undone.",
+      risk_level: "high",
+      payload: { scope: "all", confirmation },
+      expires_at: new Date(Date.now() + 30 * 60_000).toISOString(),
+      created_by: "user",
+      updated_by: "user",
+    });
+  }
+  revalidatePath("/settings");
+  revalidatePath("/approvals");
+}
+
 export async function setNotificationPreference(category: string, enabled: boolean) {
   const { supabase, user } = await requireUser();
   await supabase.from("notification_preferences").upsert({ user_id: user.id, category, channel: "email", enabled, minimum_severity: "important", status: "active", created_by: "user", updated_by: "user" }, { onConflict: "user_id,category,channel" });

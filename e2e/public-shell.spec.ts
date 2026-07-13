@@ -78,6 +78,26 @@ test("an invited user can sign in and reach the responsive product shell", async
     const profiles = await request.get(`${localSupabaseUrl}/rest/v1/profiles?user_id=eq.${user.id}&select=metadata`, { headers: restHeaders });
     const profileRows = await profiles.json() as Array<{ metadata: { notificationEmail?: string } }>;
     expect(profileRows[0]?.metadata.notificationEmail).toBe(email);
+    await page.goto("/settings");
+    await page.getByRole("button", { name: "Request data export" }).click();
+    await page.goto("/approvals");
+    await expect(page.getByText("Export Career OS data")).toBeVisible();
+    await page.getByRole("button", { name: "Approve" }).click();
+    await expect(page.getByText("Nothing needs approval")).toBeVisible();
+    await page.goto("/settings");
+    await expect(page.getByRole("link", { name: /Download Career OS export/ })).toBeVisible();
+    const exports = await request.get(`${localSupabaseUrl}/rest/v1/artifacts?user_id=eq.${user.id}&artifact_type=eq.account_export&select=status,bucket`, { headers: restHeaders });
+    expect(await exports.json()).toEqual([{ status: "active", bucket: "exports" }]);
+    await page.getByLabel("Deletion confirmation").fill("DELETE MY CAREER OS DATA");
+    await page.getByRole("button", { name: "Request deletion" }).click();
+    await expect.poll(async () => {
+      const response = await request.get(`${localSupabaseUrl}/rest/v1/approval_requests?user_id=eq.${user.id}&action_type=eq.sensitive_data.delete.request&status=eq.pending&select=id`, { headers: restHeaders });
+      return (await response.json() as Array<{ id: string }>).length;
+    }).toBe(1);
+    await page.goto("/approvals");
+    await expect(page.getByText("Permanently delete Career OS account data")).toBeVisible();
+    await page.getByRole("button", { name: "Approve" }).click();
+    await expect(page).toHaveURL(/\/login\?deleted=1/);
   } finally {
     await request.delete(`${localSupabaseUrl}/auth/v1/admin/users/${user.id}`, { headers: { apikey: localServiceRoleKey, authorization: `Bearer ${localServiceRoleKey}` } });
   }

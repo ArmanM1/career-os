@@ -822,7 +822,10 @@ export type Database = {
           created_at: string
           created_by: Database["public"]["Enums"]["actor_type"]
           decided_at: string | null
+          error_message: string | null
           evidence_ids: string[]
+          executed_at: string | null
+          expires_at: string | null
           id: string
           labels: string[]
           payload: Json
@@ -844,7 +847,10 @@ export type Database = {
           created_at?: string
           created_by?: Database["public"]["Enums"]["actor_type"]
           decided_at?: string | null
+          error_message?: string | null
           evidence_ids?: string[]
+          executed_at?: string | null
+          expires_at?: string | null
           id?: string
           labels?: string[]
           payload?: Json
@@ -866,7 +872,10 @@ export type Database = {
           created_at?: string
           created_by?: Database["public"]["Enums"]["actor_type"]
           decided_at?: string | null
+          error_message?: string | null
           evidence_ids?: string[]
+          executed_at?: string | null
+          expires_at?: string | null
           id?: string
           labels?: string[]
           payload?: Json
@@ -6294,7 +6303,10 @@ export type Database = {
           created_at: string
           created_by: Database["public"]["Enums"]["actor_type"]
           decided_at: string | null
+          error_message: string | null
           evidence_ids: string[]
+          executed_at: string | null
+          expires_at: string | null
           id: string
           labels: string[]
           payload: Json
@@ -6320,7 +6332,9 @@ export type Database = {
         Args: { p_session_id: string }
         Returns: Json
       }
+      expire_pending_approval_requests: { Args: never; Returns: number }
       expire_stale_state_items: { Args: never; Returns: number }
+      export_career_os_data: { Args: { p_user_id: string }; Returns: Json }
       recover_stale_agent_jobs: { Args: never; Returns: number }
       undo_state_item: { Args: { p_state_item_id: string }; Returns: Json }
     }
@@ -6353,7 +6367,13 @@ export type Database = {
         | "ghosted"
         | "offer"
         | "withdrawn"
-      approval_status: "pending" | "approved" | "rejected" | "cancelled"
+      approval_status:
+        | "pending"
+        | "approved"
+        | "rejected"
+        | "cancelled"
+        | "executed"
+        | "expired"
       connected_account_provider:
         | "google_calendar"
         | "gmail"
@@ -6637,7 +6657,14 @@ export const Constants = {
         "offer",
         "withdrawn",
       ],
-      approval_status: ["pending", "approved", "rejected", "cancelled"],
+      approval_status: [
+        "pending",
+        "approved",
+        "rejected",
+        "cancelled",
+        "executed",
+        "expired",
+      ],
       connected_account_provider: [
         "google_calendar",
         "gmail",

@@ -9,6 +9,8 @@ export async function GET(request: Request) {
   const now = new Date().toISOString();
   const { data: expiredCount, error: stateError } = await admin.rpc("expire_stale_state_items");
   if (stateError) return NextResponse.json({ error: "State expiry failed" }, { status: 500 });
+  const { data: expiredApprovals, error: approvalError } = await admin.rpc("expire_pending_approval_requests");
+  if (approvalError) return NextResponse.json({ error: "Approval expiry failed" }, { status: 500 });
   const { data: evidence, error: evidenceError } = await admin.from("evidence").select("id,artifact_id,user_id").is("expired_at", null).lte("expires_at", now).limit(500);
   if (evidenceError) return NextResponse.json({ error: "Evidence retention scan failed" }, { status: 500 });
   const artifactIds = [...new Set((evidence ?? []).flatMap((item) => item.artifact_id ? [item.artifact_id] : []))];
@@ -30,5 +32,5 @@ export async function GET(request: Request) {
     await admin.from("worker_devices").update({ status: "offline", updated_by: "system" }).eq("id", device.id).eq("status", "online");
     await enqueueSystemEmail(admin, { userId: device.user_id, category: "worker_failure", severity: "urgent", idempotencyKey: `worker-offline:${device.id}:${now.slice(0, 10)}`, subject: `${device.name} is offline`, body: "Career OS has not received a worker heartbeat. Queued work will wait until it reconnects.", actionUrl: "/settings/system-health", actionLabel: "Review worker" });
   }
-  return NextResponse.json({ expiredStateItems: expiredCount ?? 0, expiredEvidence: evidence?.length ?? 0, removedArtifacts, offlineWorkers: offlineDevices?.length ?? 0, checkedAt: now });
+  return NextResponse.json({ expiredStateItems: expiredCount ?? 0, expiredApprovals: expiredApprovals ?? 0, expiredEvidence: evidence?.length ?? 0, removedArtifacts, offlineWorkers: offlineDevices?.length ?? 0, checkedAt: now });
 }

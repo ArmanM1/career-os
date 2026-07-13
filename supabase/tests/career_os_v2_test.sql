@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(34);
+select plan(37);
 
 select is((select count(*)::integer from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r' and not c.relrowsecurity), 0, 'RLS enabled on every public table');
 select is((select count(*)::integer from storage.buckets where id in ('resume-sources','resume-artifacts','thread-attachments','evidence','exports') and public=false), 5, 'all storage buckets are private');
@@ -126,8 +126,16 @@ values ('00000000-0000-4000-8000-000000000711','00000000-0000-4000-8000-00000000
 insert into public.proposed_mutations(id,user_id,mutation_type,target_object_type,payload,rationale,confidence,approval_policy,status,idempotency_key)
 values ('00000000-0000-4000-8000-000000000712','00000000-0000-4000-8000-000000000101','experience.upsert','experience','{"title":"Software Engineering Intern","organization":"Example","componentType":"work","sourceArtifactId":"00000000-0000-4000-8000-000000000711","sourceSpan":{"page":1},"labels":["software"],"metadata":{}}','Resume extraction test','high','auto_apply','pending','test-resume-experience');
 select lives_ok($$select public.apply_career_mutation('00000000-0000-4000-8000-000000000712')$$, 'resume experience component mutation applies');
-select is((select status from public.experiences where title='Software Engineering Intern'), 'draft', 'extracted experience requires user verification');
-select is((select metadata->'sourceArtifactIds'->>0 from public.experiences where title='Software Engineering Intern'), '00000000-0000-4000-8000-000000000711', 'extracted component keeps source artifact provenance');
+select is(
+  (select status from public.experiences where id=(select target_object_id from public.proposed_mutations where id='00000000-0000-4000-8000-000000000712')),
+  'draft',
+  'extracted experience requires user verification'
+);
+select is(
+  (select metadata->'sourceArtifactIds'->>0 from public.experiences where id=(select target_object_id from public.proposed_mutations where id='00000000-0000-4000-8000-000000000712')),
+  '00000000-0000-4000-8000-000000000711',
+  'extracted component keeps source artifact provenance'
+);
 
 insert into public.opportunities(id,user_id,title,opportunity_type,status,url,created_by,updated_by)
 values ('00000000-0000-4000-8000-000000000801','00000000-0000-4000-8000-000000000101','Platform Engineering Intern','internship','open','https://example.com/jobs/platform','system','system');
@@ -141,6 +149,22 @@ select is((select count(*)::integer from public.audit_log_entries where target_o
 insert into public.resume_variants(id,user_id,title,status,application_id,latex_path,created_by,updated_by)
 values ('00000000-0000-4000-8000-000000000804','00000000-0000-4000-8000-000000000101','Platform role resume','ready_for_review','00000000-0000-4000-8000-000000000802','workspace/platform/main.tex','agent','agent');
 select is((select resume_variant_id from public.applications where id='00000000-0000-4000-8000-000000000802'), '00000000-0000-4000-8000-000000000804'::uuid, 'ready resume variant links back to its application');
+
+select ok(
+  array['executed','expired'] <@ enum_range(null::public.approval_status)::text[],
+  'approval lifecycle includes executed and expired outcomes'
+);
+set local role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000101',true);
+select is(
+  jsonb_array_length(public.export_career_os_data('00000000-0000-4000-8000-000000000101')->'data'->'profiles'),
+  1,
+  'user export contains only the authenticated user profile'
+);
+reset role;
+insert into public.approval_requests(id,user_id,title,status,action_type,expires_at,created_by,updated_by)
+values ('00000000-0000-4000-8000-000000000901','00000000-0000-4000-8000-000000000101','Expired export','pending','sensitive_data.export.request',now()-interval '1 minute','user','user');
+select is(public.expire_pending_approval_requests(), 1, 'maintenance expires overdue approval requests');
 
 select * from finish();
 rollback;

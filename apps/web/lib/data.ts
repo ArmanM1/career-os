@@ -5,14 +5,24 @@ async function listTable<T>(
   userId: string,
   table: string,
 ): Promise<T[]> {
-  const { data, error } = await supabase
-    .from(table)
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(100);
-  if (error) throw new Error(`Failed to load ${table}: ${error.message}`);
-  return data as T[];
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const { data, error } = await supabase
+      .from(table)
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (!error) return data as T[];
+    // GoTrue and PostgREST can differ by a fraction of a second immediately
+    // after issuing a session. One bounded retry prevents that transient clock
+    // skew from turning a successful login into a dashboard error.
+    if (attempt === 0 && error.message.includes("JWT issued at future")) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      continue;
+    }
+    throw new Error(`Failed to load ${table}: ${error.message}`);
+  }
+  throw new Error(`Failed to load ${table}: session could not be validated`);
 }
 
 export async function getDashboardData() {

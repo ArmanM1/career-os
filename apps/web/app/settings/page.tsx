@@ -10,13 +10,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { requireUser } from "@/lib/supabase/server";
-import { disconnectConnector, requestConnectorSync, setNotificationPreference, updateTimezone } from "./actions";
+import { disconnectConnector, requestAccountDeletion, requestConnectorSync, requestDataExport, setNotificationPreference, updateTimezone } from "./actions";
 
 export const dynamic = "force-dynamic";
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ connector?: string; connectorError?: string }> }) {
   const query = await searchParams;
   const { supabase, user } = await requireUser();
-  const [{ data: profile }, { data: accounts }, { data: devices }, { data: preferences }, { data: syncRuns }] =
+  const [{ data: profile }, { data: accounts }, { data: devices }, { data: preferences }, { data: syncRuns }, { data: exports }] =
     await Promise.all([
       supabase
         .from("profiles")
@@ -34,7 +34,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         .neq("status", "revoked"),
       supabase.from("notification_preferences").select("category,enabled").eq("user_id", user.id).eq("channel", "email"),
       supabase.from("connector_sync_runs").select("connected_account_id,status,completed_at,error_message,records_seen,signals_created").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30),
+      supabase.from("artifacts").select("id,title,storage_path,created_at,size_bytes").eq("user_id", user.id).eq("bucket", "exports").eq("artifact_type", "account_export").eq("status", "active").order("created_at", { ascending: false }).limit(5),
     ]);
+  const exportDownloads = await Promise.all((exports ?? []).map(async (artifact) => {
+    const { data } = await supabase.storage.from("exports").createSignedUrl(artifact.storage_path, 300);
+    return { ...artifact, signedUrl: data?.signedUrl ?? null };
+  }));
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <header>
@@ -144,6 +149,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <Button asChild variant="outline">
               <Link href="/settings/system-health">System health</Link>
             </Button>
+            <form action={requestDataExport}><Button type="submit" variant="outline">Request data export</Button></form>
+            <Button asChild variant="outline"><Link href="/approvals">Review approvals</Link></Button>
+            {exportDownloads.map((artifact) => artifact.signedUrl ? <Button key={artifact.id} asChild variant="outline"><a href={artifact.signedUrl}>Download {artifact.title}</a></Button> : null)}
+            <form action={requestAccountDeletion} className="mt-3 flex w-full flex-col gap-2 rounded-lg border border-destructive/30 p-3">
+              <p className="text-sm font-medium text-destructive">Permanent deletion</p>
+              <p className="text-xs text-muted-foreground">Type DELETE MY CAREER OS DATA. A separate high-risk approval is still required.</p>
+              <div className="flex flex-col gap-2 sm:flex-row"><Input name="confirmation" aria-label="Deletion confirmation" placeholder="DELETE MY CAREER OS DATA" required /><Button type="submit" variant="destructive">Request deletion</Button></div>
+            </form>
           </CardContent>
         </Card>
       </div>
