@@ -5,7 +5,7 @@ async function listTable<T>(
   userId: string,
   table: string,
 ): Promise<T[]> {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
     const { data, error } = await supabase
       .from(table)
       .select("*")
@@ -16,8 +16,8 @@ async function listTable<T>(
     // GoTrue and PostgREST can differ by a fraction of a second immediately
     // after issuing a session. One bounded retry prevents that transient clock
     // skew from turning a successful login into a dashboard error.
-    if (attempt === 0 && error.message.includes("JWT issued at future")) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+    if (attempt < 3 && error.message.includes("JWT issued at future")) {
+      await new Promise((resolve) => setTimeout(resolve, 500 * (2 ** attempt)));
       continue;
     }
     throw new Error(`Failed to load ${table}: ${error.message}`);
