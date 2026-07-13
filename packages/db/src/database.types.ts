@@ -3030,6 +3030,121 @@ export type Database = {
         }
         Relationships: []
       }
+      onboarding_work_items: {
+        Row: {
+          archived_at: string | null
+          attempt_count: number
+          blocking_reason: string | null
+          created_at: string
+          created_by: Database["public"]["Enums"]["actor_type"]
+          evidence_ids: string[]
+          explicitly_deferred: boolean
+          id: string
+          labels: string[]
+          latest_job_id: string | null
+          latest_run_id: string | null
+          metadata: Json
+          next_user_action: Json
+          onboarding_session_id: string
+          phase: string
+          progress: number
+          readiness_confirmed_at: string | null
+          related_object_id: string | null
+          related_object_type: string | null
+          required: boolean
+          stable_key: string
+          status: string
+          title: string
+          updated_at: string
+          updated_by: Database["public"]["Enums"]["actor_type"]
+          user_id: string
+          version: number
+          work_type: string
+        }
+        Insert: {
+          archived_at?: string | null
+          attempt_count?: number
+          blocking_reason?: string | null
+          created_at?: string
+          created_by?: Database["public"]["Enums"]["actor_type"]
+          evidence_ids?: string[]
+          explicitly_deferred?: boolean
+          id?: string
+          labels?: string[]
+          latest_job_id?: string | null
+          latest_run_id?: string | null
+          metadata?: Json
+          next_user_action?: Json
+          onboarding_session_id: string
+          phase?: string
+          progress?: number
+          readiness_confirmed_at?: string | null
+          related_object_id?: string | null
+          related_object_type?: string | null
+          required?: boolean
+          stable_key: string
+          status?: string
+          title: string
+          updated_at?: string
+          updated_by?: Database["public"]["Enums"]["actor_type"]
+          user_id: string
+          version?: number
+          work_type: string
+        }
+        Update: {
+          archived_at?: string | null
+          attempt_count?: number
+          blocking_reason?: string | null
+          created_at?: string
+          created_by?: Database["public"]["Enums"]["actor_type"]
+          evidence_ids?: string[]
+          explicitly_deferred?: boolean
+          id?: string
+          labels?: string[]
+          latest_job_id?: string | null
+          latest_run_id?: string | null
+          metadata?: Json
+          next_user_action?: Json
+          onboarding_session_id?: string
+          phase?: string
+          progress?: number
+          readiness_confirmed_at?: string | null
+          related_object_id?: string | null
+          related_object_type?: string | null
+          required?: boolean
+          stable_key?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          updated_by?: Database["public"]["Enums"]["actor_type"]
+          user_id?: string
+          version?: number
+          work_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_work_items_latest_job_id_fkey"
+            columns: ["latest_job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_work_items_latest_run_id_fkey"
+            columns: ["latest_run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_work_items_session_user_fk"
+            columns: ["onboarding_session_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_sessions"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
       open_questions: {
         Row: {
           affected_fields: string[]
@@ -6022,6 +6137,14 @@ export type Database = {
     }
     Functions: {
       apply_career_mutation: { Args: { p_mutation_id: string }; Returns: Json }
+      apply_career_mutation_legacy: {
+        Args: { p_mutation_id: string }
+        Returns: Json
+      }
+      apply_onboarding_mutation: {
+        Args: { p_mutation_id: string }
+        Returns: Json
+      }
       bump_state_version: {
         Args: { p_reason?: string; p_user_id: string }
         Returns: number
@@ -6135,6 +6258,10 @@ export type Database = {
         }
         Returns: string
       }
+      complete_onboarding: {
+        Args: { p_expected_version: number; p_session_id: string }
+        Returns: Json
+      }
       consume_worker_pairing_code: {
         Args: {
           p_capabilities?: string[]
@@ -6178,6 +6305,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      evaluate_onboarding_readiness: {
+        Args: { p_session_id: string }
+        Returns: Json
+      }
       expire_stale_state_items: { Args: never; Returns: number }
       recover_stale_agent_jobs: { Args: never; Returns: number }
       undo_state_item: { Args: { p_state_item_id: string }; Returns: Json }
@@ -6191,6 +6322,7 @@ export type Database = {
         | "failed"
         | "needs_user_input"
         | "cancelled"
+        | "dead_letter"
       agent_run_status:
         | "queued"
         | "running"
@@ -6471,6 +6603,7 @@ export const Constants = {
         "failed",
         "needs_user_input",
         "cancelled",
+        "dead_letter",
       ],
       agent_run_status: [
         "queued",

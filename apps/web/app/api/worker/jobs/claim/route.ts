@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authenticateWorker, workerUnauthorized } from "@/lib/worker-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { markOnboardingJobClaimed } from "@/lib/onboarding-job-orchestration";
 
 const inputSchema = z.object({ limit: z.number().int().min(1).max(10).default(1), leaseSeconds: z.number().int().min(30).max(1800).default(300) });
 
@@ -18,5 +19,8 @@ export async function POST(request: Request) {
     p_lease_seconds: parsed.data.leaseSeconds,
   });
   if (error) return NextResponse.json({ error: "Unable to claim jobs" }, { status: 500 });
+  for (const job of data ?? []) {
+    await markOnboardingJobClaimed(admin, job, device.userId);
+  }
   return NextResponse.json({ jobs: data ?? [] });
 }

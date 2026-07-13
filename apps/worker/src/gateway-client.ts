@@ -33,7 +33,7 @@ export class WorkerGatewayClient {
   tickSchedules() { return this.request("/api/worker/schedules/tick"); }
   claimJobs(limit = 1) { return this.request<{ jobs: ClaimedJob[] }>("/api/worker/jobs/claim", { limit, leaseSeconds: 600 }); }
   currentState() { return this.request<Record<string, unknown>>("/api/worker/state/current"); }
-  mcp(tool: string, arguments_: Record<string, unknown> = {}) { return this.request<{ result: unknown }>("/api/worker/mcp", { tool, arguments: arguments_ }); }
+  mcp(tool: string, arguments_: Record<string, unknown> = {}, context?: { jobId: string; agentId: string }) { return this.request<{ result: unknown }>("/api/worker/mcp", { tool, arguments: arguments_, context }); }
   event(jobId: string, eventType: string, message: string, payload: Record<string, unknown> = {}) { return this.request(`/api/worker/jobs/${jobId}/events`, { eventType, message, payload }); }
   complete(jobId: string, output: AgentOutput, runtime: Record<string, unknown>) { return this.request(`/api/worker/jobs/${jobId}/complete`, { output, runtime }); }
   fail(jobId: string, error: string, retryable = true) { return this.request(`/api/worker/jobs/${jobId}/fail`, { error, retryable }); }

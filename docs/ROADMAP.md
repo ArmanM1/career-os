@@ -22,6 +22,13 @@ This document tracks the accepted first-user production build. It is not a specu
 
 ## Remaining before production acceptance
 
+The immediate release gate is the onboarding-first execution contract in
+`docs/ONBOARDING_EXECUTION_PLAN.md`. Saving source URLs or resume files is not
+enough: onboarding must build/test each deterministic adapter or generate and
+validate a source-specific browser-agent `SKILL.md`, perform the first source
+read, schedule monitoring, and extract and verify the reusable resume component
+library before it can report completion. No base resume is required.
+
 1. Complete production-grade resume extraction, `latexmk` compilation, generated diffs, and the mobile PDF workflow.
 2. Complete dedicated Chrome-profile workflows for Instagram stories, Handshake, LinkedIn targeted contact lookup, portal status checks, and approved form preparation using saved CI fixtures.
 3. Finish connector cursors, manual resync/health UI, and production OAuth configuration.

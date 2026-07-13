@@ -34,7 +34,11 @@ export type RuntimeEvent = {
 export type StartThreadInput = {
   title: string;
   agentId: string;
+  jobId: string;
+  requiredCapabilities: string[];
   cwd: string;
+  toolRoot?: string;
+  browserAllowedOrigins?: string[];
 };
 
 export type RunTurnInput = {
@@ -47,7 +51,7 @@ export type RunTurnInput = {
 
 export interface AgentRuntime {
   startThread(input: StartThreadInput): Promise<RuntimeThread>;
-  resumeThread(threadId: string): Promise<RuntimeThread>;
+  resumeThread(threadId: string, input: StartThreadInput): Promise<RuntimeThread>;
   runTurn(input: RunTurnInput): AsyncIterable<RuntimeEvent>;
   interruptTurn(threadId: string, turnId: string): Promise<void>;
   archiveThread(threadId: string): Promise<void>;
@@ -66,7 +70,7 @@ export class MockRuntime implements AgentRuntime {
     return { id: randomUUID(), provider: "mock", title: input.title, cwd: input.cwd };
   }
 
-  async resumeThread(threadId: string): Promise<RuntimeThread> {
+  async resumeThread(threadId: string, _input: StartThreadInput): Promise<RuntimeThread> {
     return { id: threadId, provider: "mock", title: "Resumed thread", cwd: process.cwd() };
   }
 
@@ -79,6 +83,7 @@ export class MockRuntime implements AgentRuntime {
       payload: {
         schemaVersion: 1,
         summary: "Mock runtime completed.",
+        disposition: { status: "completed" },
         messageParts: [],
         proposedMutations: [],
         stateObservations: [],
@@ -102,8 +107,10 @@ export class MockRuntime implements AgentRuntime {
 export class CodexAppServerRuntime implements AgentRuntime {
   private client: CodexAppServerClient | null = null;
   private cwd: string | null = null;
+  private toolRoot: string | null = null;
 
   async startThread(input: StartThreadInput): Promise<RuntimeThread> {
+    this.toolRoot = input.toolRoot ?? input.cwd;
     const client = await this.clientFor(input.cwd);
     const response = await client.request<{ thread?: { id?: string } }>("thread/start", {
       model: codexModel(),
@@ -113,7 +120,7 @@ export class CodexAppServerRuntime implements AgentRuntime {
       sandbox: "workspace-write",
       config: {
         web_search: "live",
-        ...careerOsMcpConfig(input.cwd, input.agentId),
+        ...careerOsMcpConfig(this.toolRoot, input.agentId, input.browserAllowedOrigins, input.jobId, input.requiredCapabilities),
       },
       serviceName: "career-os-worker",
       baseInstructions: careerOsBaseInstructions,
@@ -131,8 +138,9 @@ export class CodexAppServerRuntime implements AgentRuntime {
     return { id, provider: "codex-app-server", title: input.title, cwd: input.cwd };
   }
 
-  async resumeThread(threadId: string): Promise<RuntimeThread> {
-    const cwd = this.cwd ?? process.cwd();
+  async resumeThread(threadId: string, input: StartThreadInput): Promise<RuntimeThread> {
+    this.toolRoot = input.toolRoot ?? input.cwd;
+    const cwd = input.cwd;
     const client = await this.clientFor(cwd);
     const response = await client.request<{ thread?: { id?: string; name?: string | null; cwd?: string | null } }>(
       "thread/resume",
@@ -145,7 +153,7 @@ export class CodexAppServerRuntime implements AgentRuntime {
         sandbox: "workspace-write",
         config: {
           web_search: "live",
-          ...careerOsMcpConfig(cwd),
+          ...careerOsMcpConfig(this.toolRoot ?? cwd, input.agentId, input.browserAllowedOrigins, input.jobId, input.requiredCapabilities),
         },
         baseInstructions: careerOsBaseInstructions,
         persistExtendedHistory: true,
@@ -736,17 +744,22 @@ function codexModel() {
   return process.env.CAREER_OS_CODEX_MODEL || undefined;
 }
 
-function careerOsMcpConfig(cwd: string, agentId?: string) {
+function careerOsMcpConfig(toolRoot: string, agentId?: string, browserAllowedOrigins: string[] = [], jobId?: string, requiredCapabilities: string[] = []) {
   const gatewayUrl = process.env.CAREER_OS_GATEWAY_URL ?? "http://localhost:3000";
-  const dataDir = process.env.CAREER_OS_DATA_DIR ?? process.env.LOCALAPPDATA;
-  if (!dataDir) throw new Error("CAREER_OS_DATA_DIR or LOCALAPPDATA is required to launch the Career OS MCP server.");
+  const configuredDataDir = process.env.CAREER_OS_DATA_DIR;
+  const localAppData = process.env.LOCALAPPDATA;
+  if (!configuredDataDir && !localAppData) throw new Error("CAREER_OS_DATA_DIR or LOCALAPPDATA is required to launch the Career OS MCP server.");
+  const dataDir = resolve(configuredDataDir ?? localAppData!, configuredDataDir ? "." : "CareerOS");
   const mcpServers: JsonObject = {
       career_os: {
         command: process.execPath,
-        args: [resolve(cwd, "node_modules/tsx/dist/cli.mjs"), resolve(cwd, "apps/worker/src/mcp-server.ts")],
+        args: [resolve(toolRoot, "node_modules/tsx/dist/cli.mjs"), resolve(toolRoot, "apps/worker/src/mcp-server.ts")],
         env: {
           CAREER_OS_GATEWAY_URL: gatewayUrl,
           CAREER_OS_DATA_DIR: dataDir,
+          CAREER_OS_JOB_ID: jobId ?? "",
+          CAREER_OS_AGENT_ID: agentId ?? "",
+          CAREER_OS_JOB_CAPABILITIES: requiredCapabilities.join(","),
         },
         startup_timeout_sec: 20,
         tool_timeout_sec: 30,
@@ -754,11 +767,13 @@ function careerOsMcpConfig(cwd: string, agentId?: string) {
   };
   const contract = agentId ? getAgentContract(agentId) : null;
   if (contract?.allowedCapabilities.includes("browser_read")) {
-    const profile = resolve(dataDir, "CareerOS", "chrome-profile");
-    const output = resolve(dataDir, "CareerOS", "workspace", "evidence", "browser");
+    const profile = resolve(dataDir, "chrome-profile");
+    const output = resolve(dataDir, "workspace", "evidence", "browser");
+    const args = [resolve(toolRoot, "node_modules/@playwright/mcp/cli.js"), "--browser", "chrome", "--user-data-dir", profile, "--output-dir", output, "--block-service-workers", "--codegen", "none", "--init-script", resolve(toolRoot, "apps/worker/src/browser-final-submit-guard.js")];
+    if (browserAllowedOrigins.length) args.push("--allowed-origins", browserAllowedOrigins.join(";"));
     mcpServers.playwright = {
       command: process.execPath,
-      args: [resolve(cwd, "node_modules/@playwright/mcp/cli.js"), "--browser", "chrome", "--user-data-dir", profile, "--output-dir", output, "--block-service-workers", "--codegen", "none", "--init-script", resolve(cwd, "apps/worker/src/browser-final-submit-guard.js")],
+      args,
       startup_timeout_sec: 30,
       tool_timeout_sec: 60,
     };

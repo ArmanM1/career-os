@@ -16,7 +16,15 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { requireUser } from "@/lib/supabase/server";
 import { isWorkerOnline } from "@/lib/worker-status";
-import { advanceOnboarding, startOnboarding } from "./actions";
+import { advanceOnboarding, retryOnboardingWorkItem, startOnboarding } from "./actions";
+import { OnboardingRealtime } from "./onboarding-realtime";
+
+type ReadinessBlocker = {
+  code?: string;
+  title?: string;
+  reason?: string;
+  nextUserAction?: { label?: string; href?: string };
+};
 
 const steps = [
   "Account & timezone",
@@ -40,7 +48,7 @@ const steps = [
 ];
 const fields: Record<
   number,
-  Array<{ name: string; label: string; placeholder?: string; long?: boolean }>
+  Array<{ name: string; label: string; placeholder?: string; long?: boolean; type?: string }>
 > = {
   1: [{ name: "timezone", label: "Timezone", placeholder: "America/Denver" }],
   3: [
@@ -128,7 +136,7 @@ const fields: Record<
       long: true,
     },
   ],
-  15: [{ name: "notificationEmail", label: "Urgent notification email" }],
+  15: [{ name: "notificationEmail", label: "Urgent notification email", type: "email" }],
   16: [
     { name: "discoveryFocus", label: "Initial discovery focus", long: true },
   ],
@@ -203,6 +211,38 @@ export default async function OnboardingPage() {
         </Card>
       </div>
     );
+  if (session.status === "completed")
+    return (
+      <div className="mx-auto max-w-2xl">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Check className="size-5 text-primary" /> Onboarding is complete
+            </CardTitle>
+            <CardDescription>
+              Your worker, verified resume components, and connected source
+              reads passed the server-side readiness checks.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild><Link href="/dashboard">Open Career OS dashboard</Link></Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  const [{ data: workItems }, { data: readinessResult }] = await Promise.all([
+    supabase
+      .from("onboarding_work_items")
+      .select("id,title,work_type,status,phase,progress,blocking_reason,next_user_action,related_object_type,related_object_id,updated_at")
+      .eq("user_id", user.id)
+      .eq("onboarding_session_id", session.id)
+      .neq("status", "archived")
+      .order("created_at"),
+    supabase.rpc("evaluate_onboarding_readiness", { p_session_id: session.id }),
+  ]);
+  const readiness = readinessResult && typeof readinessResult === "object" && !Array.isArray(readinessResult)
+    ? readinessResult as { ready?: boolean; blockers?: ReadinessBlocker[] }
+    : {};
   const step = session.current_step;
   const progress = Math.round((session.completed_steps.length / 18) * 100);
   const answers = session.answers as Record<string, string>;
@@ -215,7 +255,13 @@ export default async function OnboardingPage() {
       ? "Upload and extract at least one experience before review."
       : null,
   ].filter(Boolean);
+  const visibleWorkItems = (workItems ?? []).filter((item) =>
+    step === 18 ||
+    ([7, 8, 9].includes(step) && item.work_type === "resume") ||
+    ([14, 15, 16].includes(step) && item.work_type === "source"),
+  );
   return (
+    <OnboardingRealtime sessionId={session.id}>
     <div className="mx-auto max-w-4xl space-y-6">
       <header>
         <div className="flex items-center justify-between">
@@ -239,6 +285,72 @@ export default async function OnboardingPage() {
           <AlertDescription>{blocker}</AlertDescription>
         </Alert>
       ))}
+      {visibleWorkItems.length ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Setup running in the background</CardTitle>
+            <CardDescription>
+              These cards update live. Career OS attempts each source automatically
+              and asks you only when login, MFA, CAPTCHA, consent, or school SSO
+              truly requires you.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {visibleWorkItems.map((item) => {
+              const action = item.next_user_action && typeof item.next_user_action === "object" && !Array.isArray(item.next_user_action)
+                ? item.next_user_action as { label?: string; href?: string; instructions?: string }
+                : {};
+              return (
+                <div key={item.id} className="rounded-lg border p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="font-medium">{item.title}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{item.phase.replaceAll("_", " ")}</p>
+                    </div>
+                    <Badge variant={item.status === "ready" ? "default" : "outline"}>{item.status.replaceAll("_", " ")}</Badge>
+                  </div>
+                  <Progress value={item.progress} className="mt-3" />
+                  {item.blocking_reason ? <p className="mt-3 text-sm text-muted-foreground">{item.blocking_reason}</p> : null}
+                  {action.instructions ? <p className="mt-2 text-xs text-muted-foreground">{action.instructions}</p> : null}
+                  {action.href ? (
+                    <Button asChild size="sm" variant="outline" className="mt-3">
+                      {action.href.startsWith("http")
+                        ? <a href={action.href} target="_blank" rel="noreferrer">{action.label ?? "Complete setup"}</a>
+                        : <Link href={action.href}>{action.label ?? "Complete setup"}</Link>}
+                    </Button>
+                  ) : null}
+                  {item.status === "waiting_for_user" || item.status === "failed" || item.status === "unsupported" ? (
+                    <form action={retryOnboardingWorkItem.bind(null, item.id)} className="mt-3">
+                      <Button type="submit" size="sm">Retry now</Button>
+                    </form>
+                  ) : null}
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      ) : null}
+      {step === 18 && readiness.blockers?.length ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Final readiness checks</CardTitle>
+            <CardDescription>Onboarding completes only after every required item below is resolved.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {readiness.blockers.map((blocker, index) => (
+              <div key={`${blocker.code ?? "blocker"}-${index}`} className="rounded-lg border p-3">
+                <p className="font-medium">{blocker.title ?? "Setup incomplete"}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{blocker.reason}</p>
+                {blocker.nextUserAction?.href ? (
+                  <Button asChild size="sm" variant="outline" className="mt-2">
+                    <Link href={blocker.nextUserAction.href}>{blocker.nextUserAction.label ?? "Resolve"}</Link>
+                  </Button>
+                ) : null}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
       {questions?.length ? (
         <Card>
           <CardHeader>
@@ -284,7 +396,7 @@ export default async function OnboardingPage() {
                   <Textarea
                     id={field.name}
                     name={field.name}
-                    defaultValue={answers[field.name] ?? ""}
+                    defaultValue={answers[field.name] ?? (field.name === "knownSources" ? "https://www.instagram.com/zero2sudo/" : field.name === "notificationEmail" ? user.email ?? "" : "")}
                     placeholder={field.placeholder}
                     rows={5}
                   />
@@ -292,8 +404,9 @@ export default async function OnboardingPage() {
                   <Input
                     id={field.name}
                     name={field.name}
-                    defaultValue={answers[field.name] ?? ""}
+                    defaultValue={answers[field.name] ?? (field.name === "knownSources" ? "https://www.instagram.com/zero2sudo/" : field.name === "notificationEmail" ? user.email ?? "" : "")}
                     placeholder={field.placeholder}
+                    type={field.type}
                   />
                 )}
               </div>
@@ -312,7 +425,8 @@ export default async function OnboardingPage() {
               </p>
               <Button
                 disabled={Boolean(
-                  blockers.length && (step === 2 || step === 9 || step === 18),
+                  (blockers.length && (step === 2 || step === 9)) ||
+                  (step === 18 && !readiness.ready),
                 )}
               >
                 {step === 18 ? (
@@ -331,5 +445,6 @@ export default async function OnboardingPage() {
         </CardContent>
       </Card>
     </div>
+    </OnboardingRealtime>
   );
 }

@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   const admin = getSupabaseAdminClient();
   const { data: delivery } = await admin.from("notification_deliveries").select("id,user_id,outbox_id").eq("provider_message_id", event.data.email_id).maybeSingle();
   if (!delivery) return NextResponse.json({ received: true, matched: false });
-  await admin.from("notification_deliveries").update({ status, metadata: { eventType: event.type, eventCreatedAt: event.created_at }, updated_by: "system" }).eq("id", delivery.id);
+  await admin.from("notification_deliveries").update({ status, payload: { eventType: event.type, eventCreatedAt: event.created_at }, updated_by: "system" }).eq("id", delivery.id);
   if (["bounced", "failed", "complained", "suppressed"].includes(status)) await admin.from("notification_outbox").update({ status: "failed", last_error: `Resend reported ${status}`, updated_by: "system" }).eq("id", delivery.outbox_id);
   return NextResponse.json({ received: true, matched: true });
 }

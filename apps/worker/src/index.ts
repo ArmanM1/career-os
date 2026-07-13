@@ -22,6 +22,7 @@ import {
 } from "./gateway-client";
 import { createRuntime, NeedsUserInputError } from "./runtime";
 import { runSourceAdapter } from "./source-adapters";
+import { materializeBrowserSourceSkill } from "./source-browser-skill";
 
 const capabilities = [
   "codex",
@@ -130,7 +131,7 @@ async function main() {
           regularJobs.map(async (job) => {
             const jobRuntime = createRuntime(env.runtime);
             try {
-              await processJob(gateway, jobRuntime, repoRoot, job);
+              await processJob(gateway, jobRuntime, repoRoot, env.dataDir, job);
             } finally {
               await jobRuntime.dispose?.();
             }
@@ -140,7 +141,7 @@ async function main() {
           for (const job of browserJobs) {
             const jobRuntime = createRuntime(env.runtime);
             try {
-              await processJob(gateway, jobRuntime, repoRoot, job);
+              await processJob(gateway, jobRuntime, repoRoot, env.dataDir, job);
             } finally {
               await jobRuntime.dispose?.();
             }
@@ -150,7 +151,7 @@ async function main() {
           for (const job of latexJobs) {
             const jobRuntime = createRuntime(env.runtime);
             try {
-              await processJob(gateway, jobRuntime, repoRoot, job);
+              await processJob(gateway, jobRuntime, repoRoot, env.dataDir, job);
             } finally {
               await jobRuntime.dispose?.();
             }
@@ -171,9 +172,10 @@ async function processJob(
   gateway: WorkerGatewayClient,
   runtime: ReturnType<typeof createRuntime>,
   repoRoot: string,
+  dataDir: string,
   job: ClaimedJob,
 ) {
-  await synchronizeJobArtifact(gateway, job);
+  await synchronizeJobArtifact(gateway, job, dataDir);
   const agent = getAgentDefinition(job.agent_id);
   if (!agent)
     return gateway.fail(job.id, `Unknown agent ${job.agent_id}`, false);
@@ -194,21 +196,24 @@ async function processJob(
   }, 60_000);
   leaseHeartbeat.unref();
   try {
+    const execution = await prepareJobExecution(job, repoRoot, dataDir);
     let state = await gateway.currentState();
-    const existingRuntimeThreadId = typeof job.metadata?.runtimeThreadId === "string" ? job.metadata.runtimeThreadId : null;
+    const existingRuntimeThreadId = agent.id === "career-source-browser-reader" ? null : typeof job.metadata?.runtimeThreadId === "string" ? job.metadata.runtimeThreadId : null;
+    const threadInput = { title: `${agent.displayName}: ${job.title}`, agentId: agent.id, jobId: job.id, requiredCapabilities: job.required_capabilities, cwd: execution.cwd, toolRoot: repoRoot, browserAllowedOrigins: execution.browserAllowedOrigins };
     const thread = existingRuntimeThreadId
-      ? await runtime.resumeThread(existingRuntimeThreadId)
-      : await runtime.startThread({ title: `${agent.displayName}: ${job.title}`, agentId: agent.id, cwd: repoRoot });
+      ? await runtime.resumeThread(existingRuntimeThreadId, threadInput)
+      : await runtime.startThread(threadInput);
     let finalPayload: unknown = null;
     for await (const event of runtime.runTurn({
       agentId: agent.id,
       thread,
       prompt: job.prompt ?? "",
-      skillPath: agent.skillPath,
+      skillPath: execution.skillPath,
       context: {
         currentState: state,
         input: job.input,
         requiredCapabilities: job.required_capabilities,
+        sourceSkillChecksum: execution.sourceSkillChecksum,
       },
     })) {
       await gateway.event(
@@ -229,8 +234,8 @@ async function processJob(
         agentId: agent.id,
         thread,
         prompt: `Career OS state changed while you were working. Revalidate the prior structured output against the new CurrentStateBundle. Return the complete revised output and preserve only still-correct mutations.\n\nPrior output:\n${JSON.stringify(contract.output)}`,
-        skillPath: agent.skillPath,
-        context: { currentState: latestState, input: job.input, requiredCapabilities: job.required_capabilities, revalidation: true },
+        skillPath: execution.skillPath,
+        context: { currentState: latestState, input: job.input, requiredCapabilities: job.required_capabilities, sourceSkillChecksum: execution.sourceSkillChecksum, revalidation: true },
       })) {
         await gateway.event(job.id, event.type, event.message, event.payload ?? {});
         if (event.type === "completed") revalidatedPayload = event.payload;
@@ -264,7 +269,36 @@ async function processJob(
   }
 }
 
-async function synchronizeJobArtifact(gateway: WorkerGatewayClient, job: ClaimedJob) {
+async function prepareJobExecution(job: ClaimedJob, repoRoot: string, dataDir: string) {
+  if (job.agent_id !== "career-source-browser-reader") {
+    let browserAllowedOrigins: string[] = [];
+    if (job.input.type === "source.inspect" && typeof job.input.url === "string") {
+      try { browserAllowedOrigins = [new URL(job.input.url).origin]; } catch { browserAllowedOrigins = []; }
+    }
+    return {
+      cwd: repoRoot,
+      skillPath: getAgentDefinition(job.agent_id)?.skillPath ?? "",
+      browserAllowedOrigins,
+      sourceSkillChecksum: null as string | null,
+    };
+  }
+  const definition = job.input.browserSkillDefinition;
+  if (!definition || typeof definition !== "object") throw new Error("Browser source job is missing its generated skill definition.");
+  const materialized = await materializeBrowserSourceSkill(
+    definition as Parameters<typeof materializeBrowserSourceSkill>[0],
+    resolve(dataDir, "workspace", "source-skills"),
+  );
+  const expectedChecksum = typeof job.input.browserSkillChecksum === "string" ? job.input.browserSkillChecksum : null;
+  if (expectedChecksum && expectedChecksum !== materialized.checksum) throw new Error("Generated browser source skill checksum does not match the activated adapter.");
+  return {
+    cwd: materialized.cwd,
+    skillPath: materialized.skillPath,
+    browserAllowedOrigins: materialized.allowedOrigins,
+    sourceSkillChecksum: materialized.checksum,
+  };
+}
+
+async function synchronizeJobArtifact(gateway: WorkerGatewayClient, job: ClaimedJob, dataDir: string) {
   const storagePath = typeof job.input.storagePath === "string" ? job.input.storagePath : null;
   const artifactId = typeof job.input.artifactId === "string" ? job.input.artifactId : null;
   if (!storagePath || !artifactId || job.input.localPath) return;
@@ -274,7 +308,7 @@ async function synchronizeJobArtifact(gateway: WorkerGatewayClient, job: Claimed
   const bytes = Buffer.from(await response.arrayBuffer());
   if (bytes.length > 50 * 1024 * 1024) throw new Error("Artifact exceeds the 50 MB worker synchronization limit.");
   const fileName = storagePath.split("/").pop()?.replace(/[^a-zA-Z0-9._-]+/g, "-") || `${artifactId}.bin`;
-  const localPath = resolve(process.env.LOCALAPPDATA ?? tmpdir(), "CareerOS", "workspace", "resume-sources", artifactId, fileName);
+  const localPath = resolve(dataDir || tmpdir(), "workspace", "resume-sources", artifactId, fileName);
   await mkdir(dirname(localPath), { recursive: true });
   await writeFile(localPath, bytes);
   const sha256 = createHash("sha256").update(bytes).digest("hex");

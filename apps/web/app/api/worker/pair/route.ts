@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   const { data, error } = await admin.rpc("consume_worker_pairing_code", {
     p_code_hash: hashPairingCode(parsed.data.code),
     p_device_secret_hash: hashDeviceSecret(secret),
-    p_worker_version: parsed.data.workerVersion ?? null,
+    p_worker_version: parsed.data.workerVersion,
     p_capabilities: parsed.data.capabilities,
   });
   const paired = Array.isArray(data) ? data[0] : data;

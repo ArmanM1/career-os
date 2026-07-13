@@ -8,10 +8,14 @@ import { isAbsolute, relative, resolve } from "node:path";
 import { loadDeviceCredentials } from "./device-credentials";
 import { readWorkerEnv } from "./env";
 import { WorkerGatewayClient } from "./gateway-client";
+import { runSourceAdapter } from "./source-adapters";
 
 const env = readWorkerEnv();
 const gateway = new WorkerGatewayClient(env.gatewayUrl, loadDeviceCredentials(env.dataDir));
 const server = new McpServer({ name: "career-os", version: "1.0.0" });
+const agentId = process.env.CAREER_OS_AGENT_ID ?? "";
+const jobId = process.env.CAREER_OS_JOB_ID ?? "";
+const jobCapabilities = new Set((process.env.CAREER_OS_JOB_CAPABILITIES ?? "").split(",").filter(Boolean));
 const readOnly = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } as const;
 const proposal = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false } as const;
 
@@ -22,7 +26,8 @@ function result(value: unknown) {
 function register(name: string, description: string, inputSchema: Record<string, z.ZodType>, annotations: typeof readOnly | typeof proposal) {
   server.registerTool(name, { description, inputSchema, annotations }, async (input) => {
     if (name === "career.artifact.create") await uploadLocalArtifact(input as Record<string, unknown>);
-    const response = await gateway.mcp(name, input as Record<string, unknown>);
+    if (!jobId || !agentId) throw new Error("Career OS MCP tools require a scoped active job.");
+    const response = await gateway.mcp(name, input as Record<string, unknown>, { jobId, agentId });
     return result(response.result);
   });
 }
@@ -55,6 +60,28 @@ register("career.contacts.list", "List contacts and mentors.", listInput, readOn
 register("career.events.list", "List career events.", listInput, readOnly);
 register("career.resumes.read", "Read resume versions and generated variants.", { limit: z.number().int().min(1).max(200).default(50) }, readOnly);
 register("career.sources.list", "List configured source monitors and health.", listInput, readOnly);
+if (agentId === "career-source-adapter-builder" && jobCapabilities.has("run_adapter")) {
+  server.registerTool("career.sources.test_adapter", {
+    description: "Safely execute one declarative deterministic adapter test against its HTTPS source. This cannot run custom code or shell commands.",
+    inputSchema: {
+      sourceMonitorId: z.uuid(),
+      title: z.string().min(1),
+      sourceType: z.string().min(1),
+      sourceUrl: z.url(),
+      schedule: z.string().default("every_6_hours"),
+      adapterType: z.enum(["rss", "github_markdown", "csv", "greenhouse", "lever", "ashby", "json", "html_selector"]),
+      definition: z.record(z.string(), z.unknown()).default({}),
+    },
+    annotations: readOnly,
+  }, async (input) => result(await runSourceAdapter({
+    id: input.sourceMonitorId,
+    title: input.title,
+    source_type: input.sourceType,
+    url: input.sourceUrl,
+    schedule: input.schedule,
+    metadata: { ...input.definition, adapterType: input.adapterType },
+  })));
+}
 register("career.evidence.read", "Read one evidence record and provenance.", { id: z.uuid() }, readOnly);
 register("career.thread.read", "Read a persisted user-facing thread and visible messages.", { id: z.uuid() }, readOnly);
 register("career.search", "Search Career OS opportunities, contacts, experiences, and messages.", { query: z.string().min(2).max(200), limit: z.number().int().min(1).max(50).default(20) }, readOnly);

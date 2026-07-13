@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authorizeWorkerJob } from "@/lib/worker-job-route";
 import { enqueueSystemEmail } from "@/lib/notification-outbox";
+import { onboardingWorkItemIdFromJob, updateOnboardingWorkItem } from "@/lib/onboarding-work-items";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,6 +20,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     updated_by: "system",
   }).eq("id", id).eq("status", "running");
   if (error) return NextResponse.json({ error: "Unable to fail job" }, { status: 500 });
+  await updateOnboardingWorkItem(context.admin, onboardingWorkItemIdFromJob(context.job), context.device.userId, {
+    status: retry ? "queued" : "failed",
+    phase: retry ? "retry_scheduled" : "job_failed",
+    progress: retry ? 20 : 50,
+    latestJobId: id,
+    attemptCount: context.job.attempt_count,
+    blockingReason: retry ? `Retrying automatically: ${String(body.error ?? "Worker job failed").slice(0, 500)}` : String(body.error ?? "Worker job failed").slice(0, 4000),
+  });
   if (!retry) await enqueueSystemEmail(context.admin, { userId: context.device.userId, category: "worker_failure", severity: "urgent", idempotencyKey: `dead-letter-job:${id}`, subject: "Career OS work needs attention", body: `${context.job.title} exhausted its retry limit: ${String(body.error ?? "Worker job failed").slice(0, 1000)}`, actionUrl: "/settings/system-health", actionLabel: "Review system health" });
   return NextResponse.json({ ok: true, retryScheduled: retry });
 }

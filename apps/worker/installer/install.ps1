@@ -58,7 +58,7 @@ try {
 } finally { Pop-Location }
 
 $env:CAREER_OS_GATEWAY_URL = $GatewayUrl.TrimEnd("/")
-$env:CAREER_OS_DATA_DIR = $env:LOCALAPPDATA
+$env:CAREER_OS_DATA_DIR = $InstallRoot
 Push-Location $sourceRoot
 try {
   & npm --workspace @career-os/worker run dev -- --pair $PairingCode
@@ -68,7 +68,7 @@ try {
 $runner = @"
 `$ErrorActionPreference = "Stop"
 `$env:CAREER_OS_GATEWAY_URL = "$($GatewayUrl.TrimEnd('/'))"
-`$env:CAREER_OS_DATA_DIR = "$env:LOCALAPPDATA"
+`$env:CAREER_OS_DATA_DIR = "$InstallRoot"
 Set-Location -LiteralPath "$sourceRoot"
 & npm --workspace @career-os/worker run dev *>> "$(Join-Path $logsRoot 'worker.log')"
 "@
@@ -81,5 +81,21 @@ $settings = New-ScheduledTaskSettingsSet -RestartCount 10 -RestartInterval (New-
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
 Register-ScheduledTask -TaskName "Career OS Worker" -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null
 Start-ScheduledTask -TaskName "Career OS Worker"
+
+$browserRunner = @"
+`$ErrorActionPreference = "Stop"
+Start-Process -FilePath "$chromePath" -ArgumentList @("--user-data-dir=`"$(Join-Path $InstallRoot 'chrome-profile')`"", "https://www.instagram.com/")
+"@
+$browserRunnerPath = Join-Path $InstallRoot "open-career-os-browser.ps1"
+[System.IO.File]::WriteAllText($browserRunnerPath, $browserRunner, [System.Text.UTF8Encoding]::new($false))
+$shortcutPath = Join-Path ([Environment]::GetFolderPath("Desktop")) "Career OS Browser.lnk"
+$shell = New-Object -ComObject WScript.Shell
+$shortcut = $shell.CreateShortcut($shortcutPath)
+$shortcut.TargetPath = "powershell.exe"
+$shortcut.Arguments = "-NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$browserRunnerPath`""
+$shortcut.WorkingDirectory = $InstallRoot
+$shortcut.IconLocation = "$chromePath,0"
+$shortcut.Save()
+
 Start-Process -FilePath $chromePath -ArgumentList @("--user-data-dir=`"$(Join-Path $InstallRoot 'chrome-profile')`"", "https://www.instagram.com/")
-Write-Output "Career OS worker installed, paired, and started. A dedicated Chrome profile was opened so you can sign in to configured sources."
+Write-Output "Career OS worker installed, paired, and started. The dedicated browser is open, and a Career OS Browser shortcut was added to the desktop for future source sign-ins."

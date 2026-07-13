@@ -1,0 +1,4 @@
+interface:
+  display_name: "Source Browser Reader"
+  short_description: "Read one configured career source through the dedicated browser."
+  default_prompt: "Read the configured source, capture evidence, and return normalized career signals without external writes."

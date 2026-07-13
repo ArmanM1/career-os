@@ -1,11 +1,14 @@
 import { requireUser } from "@/lib/supabase/server";
 
-async function listTable<T>(table: string): Promise<T[]> {
-  const { supabase, user } = await requireUser();
+async function listTable<T>(
+  supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
+  userId: string,
+  table: string,
+): Promise<T[]> {
   const { data, error } = await supabase
     .from(table)
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(100);
   if (error) throw new Error(`Failed to load ${table}: ${error.message}`);
@@ -13,6 +16,7 @@ async function listTable<T>(table: string): Promise<T[]> {
 }
 
 export async function getDashboardData() {
+  const { supabase, user } = await requireUser();
   const [
     tasks,
     applications,
@@ -26,17 +30,17 @@ export async function getDashboardData() {
     signals,
     opportunityRecommendations,
   ] = await Promise.all([
-    listTable<Record<string, unknown>>("tasks"),
-    listTable<Record<string, unknown>>("applications"),
-    listTable<Record<string, unknown>>("approval_requests"),
-    listTable<Record<string, unknown>>("source_monitors"),
-    listTable<Record<string, unknown>>("goals"),
-    listTable<Record<string, unknown>>("resume_variants"),
-    listTable<Record<string, unknown>>("agent_runs"),
-    listTable<Record<string, unknown>>("source_candidates"),
-    listTable<Record<string, unknown>>("source_discovery_runs"),
-    listTable<Record<string, unknown>>("signals"),
-    listTable<Record<string, unknown>>("opportunity_recommendations"),
+    listTable<Record<string, unknown>>(supabase, user.id, "tasks"),
+    listTable<Record<string, unknown>>(supabase, user.id, "applications"),
+    listTable<Record<string, unknown>>(supabase, user.id, "approval_requests"),
+    listTable<Record<string, unknown>>(supabase, user.id, "source_monitors"),
+    listTable<Record<string, unknown>>(supabase, user.id, "goals"),
+    listTable<Record<string, unknown>>(supabase, user.id, "resume_variants"),
+    listTable<Record<string, unknown>>(supabase, user.id, "agent_runs"),
+    listTable<Record<string, unknown>>(supabase, user.id, "source_candidates"),
+    listTable<Record<string, unknown>>(supabase, user.id, "source_discovery_runs"),
+    listTable<Record<string, unknown>>(supabase, user.id, "signals"),
+    listTable<Record<string, unknown>>(supabase, user.id, "opportunity_recommendations"),
   ]);
 
   return {

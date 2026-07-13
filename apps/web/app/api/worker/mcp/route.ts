@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { mutationRegistry } from "@career-os/core";
+import { getAgentContract, mutationRegistry } from "@career-os/core";
 import { z } from "zod";
 import { assembleCurrentState } from "@/lib/current-state";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { authenticateWorker, workerUnauthorized } from "@/lib/worker-auth";
+import { toJson } from "@/lib/json";
 
 const toolSchema = z.enum([
   "career.state.current",
@@ -26,7 +27,11 @@ const toolSchema = z.enum([
   "career.jobs.enqueue",
 ]);
 
-const requestSchema = z.object({ tool: toolSchema, arguments: z.record(z.string(), z.unknown()).default({}) });
+const requestSchema = z.object({
+  tool: toolSchema,
+  arguments: z.record(z.string(), z.unknown()).default({}),
+  context: z.object({ jobId: z.uuid(), agentId: z.string().min(1) }),
+});
 const listSchema = z.object({ status: z.string().optional(), limit: z.coerce.number().int().min(1).max(200).default(50) });
 const idSchema = z.object({ id: z.uuid() });
 const mutationSchema = z.object({
@@ -51,9 +56,23 @@ export async function POST(request: Request) {
   if (!device) return workerUnauthorized();
   const parsed = requestSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: "Invalid MCP tool request" }, { status: 400 });
+  const admin = getSupabaseAdminClient();
+  const { data: job } = await admin
+    .from("agent_jobs")
+    .select("id,agent_id,status,required_capabilities")
+    .eq("id", parsed.data.context.jobId)
+    .eq("user_id", device.userId)
+    .eq("claimed_by_device_id", device.id)
+    .eq("status", "running")
+    .maybeSingle();
+  if (!job || job.agent_id !== parsed.data.context.agentId)
+    return NextResponse.json({ error: "MCP scope does not match the active claimed job" }, { status: 403 });
+  const contract = getAgentContract(job.agent_id);
+  if (!contract || !toolAllowedForJob(parsed.data.tool, contract.allowedCapabilities, job.required_capabilities))
+    return NextResponse.json({ error: "This agent job is not allowed to use that Career OS tool" }, { status: 403 });
 
   try {
-    const result = await callTool(device.userId, parsed.data.tool, parsed.data.arguments);
+    const result = await callTool(device.userId, job.agent_id, parsed.data.tool, parsed.data.arguments);
     return NextResponse.json({ result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "MCP tool failed";
@@ -61,7 +80,14 @@ export async function POST(request: Request) {
   }
 }
 
-async function callTool(userId: string, tool: z.infer<typeof toolSchema>, input: Record<string, unknown>) {
+function toolAllowedForJob(tool: z.infer<typeof toolSchema>, allowedCapabilities: readonly string[], requiredCapabilities: string[]) {
+  if (tool === "career.jobs.enqueue") return allowedCapabilities.includes("enqueue_jobs");
+  if (tool === "career.artifact.create") return allowedCapabilities.includes("write_workspace") && requiredCapabilities.includes("write_workspace");
+  if (["career.mutations.propose", "career.approvals.request", "career.evidence.create"].includes(tool)) return allowedCapabilities.includes("propose_mutations");
+  return allowedCapabilities.includes("read_state");
+}
+
+async function callTool(userId: string, agentId: string, tool: z.infer<typeof toolSchema>, input: Record<string, unknown>) {
   const admin = getSupabaseAdminClient();
   if (tool === "career.state.current") return assembleCurrentState(userId);
   if (tool === "career.profile.read") return single(admin.from("profiles").select("*").eq("user_id", userId).maybeSingle());
@@ -104,6 +130,7 @@ async function callTool(userId: string, tool: z.infer<typeof toolSchema>, input:
     const mutation = mutationSchema.parse(input);
     const registryEntry = mutationRegistry[mutation.mutationType as keyof typeof mutationRegistry];
     if (!registryEntry) throw new Error(`Unsupported mutation type: ${mutation.mutationType}`);
+    if (!registryEntry.owners.includes(agentId as never)) throw new Error(`${agentId} cannot propose ${mutation.mutationType}`);
     const payload = registryEntry.payloadSchema.parse(mutation.payload);
     const { data, error } = await admin.from("proposed_mutations").upsert({
       id: mutation.id,
@@ -112,13 +139,13 @@ async function callTool(userId: string, tool: z.infer<typeof toolSchema>, input:
       mutation_type: mutation.mutationType,
       target_object_type: mutation.targetObjectType,
       target_object_id: mutation.targetObjectId,
-      payload,
+      payload: toJson(payload),
       rationale: mutation.rationale,
       evidence_ids: mutation.evidenceIds,
       confidence: mutation.confidence,
       expected_object_version: mutation.expectedObjectVersion,
       approval_policy: registryEntry.approvalPolicy,
-      status: "proposed",
+      status: "pending",
       created_by: "agent",
       updated_by: "agent",
     }, { onConflict: "user_id,idempotency_key", ignoreDuplicates: true }).select().maybeSingle();
@@ -128,14 +155,14 @@ async function callTool(userId: string, tool: z.infer<typeof toolSchema>, input:
 
   if (tool === "career.approvals.request") {
     const value = approvalSchema.parse(input);
-    const { data, error } = await admin.from("approval_requests").insert({ user_id: userId, title: value.title, action_type: value.actionType, rationale: value.rationale, risk_level: value.riskLevel, payload: value.payload, target_object_type: value.targetObjectType, target_object_id: value.targetObjectId, evidence_ids: value.evidenceIds, created_by: "agent", updated_by: "agent" }).select().single();
+    const { data, error } = await admin.from("approval_requests").insert({ user_id: userId, title: value.title, action_type: value.actionType, rationale: value.rationale, risk_level: value.riskLevel, payload: toJson(value.payload), target_object_type: value.targetObjectType, target_object_id: value.targetObjectId, evidence_ids: value.evidenceIds, created_by: "agent", updated_by: "agent" }).select().single();
     if (error) throw new Error("Unable to create approval request");
     return data;
   }
 
   if (tool === "career.evidence.create") {
     const value = evidenceSchema.parse(input);
-    const { data, error } = await admin.from("evidence").insert({ user_id: userId, title: value.title, source_type: value.sourceType, source_url: value.sourceUrl, excerpt: value.excerpt, payload: value.payload, artifact_id: value.artifactId, expires_at: value.expiresAt, retention_policy: value.retentionPolicy, created_by: "agent", updated_by: "agent" }).select().single();
+    const { data, error } = await admin.from("evidence").insert({ user_id: userId, title: value.title, source_type: value.sourceType, source_url: value.sourceUrl, excerpt: value.excerpt, payload: toJson(value.payload), artifact_id: value.artifactId, expires_at: value.expiresAt, retention_policy: value.retentionPolicy, created_by: "agent", updated_by: "agent" }).select().single();
     if (error) throw new Error("Unable to create evidence");
     return data;
   }
@@ -149,7 +176,7 @@ async function callTool(userId: string, tool: z.infer<typeof toolSchema>, input:
   }
 
   const value = jobSchema.parse(input);
-  const { data, error } = await admin.from("agent_jobs").upsert({ user_id: userId, agent_id: value.agentId, title: value.title, input_type: value.inputType, input: value.input, prompt: value.prompt, related_object_ids: value.relatedObjectIds, required_capabilities: value.requiredCapabilities, priority: value.priority, scheduled_for: value.scheduledFor ?? new Date().toISOString(), dedupe_key: value.dedupeKey, created_by: "agent", updated_by: "agent" }, { onConflict: "user_id,dedupe_key", ignoreDuplicates: true }).select().maybeSingle();
+  const { data, error } = await admin.from("agent_jobs").upsert({ user_id: userId, agent_id: value.agentId, title: value.title, input_type: value.inputType, input: toJson(value.input), prompt: value.prompt, related_object_ids: value.relatedObjectIds, required_capabilities: value.requiredCapabilities, priority: value.priority, scheduled_for: value.scheduledFor ?? new Date().toISOString(), dedupe_key: value.dedupeKey, created_by: "agent", updated_by: "agent" }, { onConflict: "user_id,dedupe_key", ignoreDuplicates: true }).select().maybeSingle();
   if (error) throw new Error("Unable to enqueue agent job");
   return data;
 }

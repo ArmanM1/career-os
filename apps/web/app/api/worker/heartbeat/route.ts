@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authenticateWorker, workerUnauthorized } from "@/lib/worker-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { toJson } from "@/lib/json";
 
 const healthSchema = z.object({
   workerVersion: z.string().max(40).optional(),
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
     last_heartbeat_at: new Date().toISOString(),
     worker_version: parsed.data.workerVersion,
     capabilities: parsed.data.capabilities,
-    health: parsed.data.health,
+    health: toJson(parsed.data.health),
     last_error: parsed.data.lastError,
     updated_by: "system",
   }).eq("id", device.id).eq("user_id", device.userId).neq("status", "revoked");

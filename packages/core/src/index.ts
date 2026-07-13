@@ -6,3 +6,4 @@ export * from "./agent-contracts";
 export * from "./current-state";
 export * from "./career-logic";
 export * from "./fixtures";
+export * from "./source-browser-skills";

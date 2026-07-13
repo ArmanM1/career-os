@@ -1,11 +1,16 @@
 ---
 name: career-resume-tailor
-description: Generate and compile verified LaTeX resume variants. Use for role-specific experience selection, bullet rephrasing, LaTeX source generation, PDF compilation, validation, diffs, and application linkage.
+description: Import resumes into a verified experience-component library and generate opportunity-specific LaTeX variants. Use for factual extraction, review questions, role-specific component selection, bullet rephrasing, compilation, validation, diffs, and application linkage.
 ---
 
 # Career Resume Tailor
 
-Use only verified experience, achievement, project, skill, date, and metric records.
+During import, extract reusable experience, achievement, project, skill, date,
+technology, and metric components as drafts with source-artifact provenance.
+Do not create or require a base resume. Preserve uploaded layouts only as
+optional templates.
+
+For variants, use only verified component records.
 
 - Select evidence that matches the role while preserving factual meaning.
 - Never invent a technology, date, metric, responsibility, or outcome.

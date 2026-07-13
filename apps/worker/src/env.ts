@@ -37,6 +37,8 @@ export function readWorkerEnv(): WorkerEnv {
     gatewayUrl: gatewayUrl.replace(/\/$/, ""),
     pollMs: Number.isFinite(pollMs) && pollMs >= 1000 ? pollMs : 10000,
     runtime,
-    dataDir: resolve(process.env.CAREER_OS_DATA_DIR ?? localAppData, "CareerOS"),
+    dataDir: process.env.CAREER_OS_DATA_DIR
+      ? resolve(process.env.CAREER_OS_DATA_DIR)
+      : resolve(localAppData, "CareerOS"),
   };
 }

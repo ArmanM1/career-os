@@ -5,11 +5,17 @@ import { decryptOAuthToken, encryptOAuthToken } from "@/lib/oauth-crypto";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { authenticateWorker, workerUnauthorized } from "@/lib/worker-auth";
 import { enqueueSystemEmail } from "@/lib/notification-outbox";
+import type { Database } from "@career-os/db";
+import { toJson } from "@/lib/json";
 
 const inputSchema = z.object({ connectedAccountId: z.uuid() });
 type Admin = ReturnType<typeof getSupabaseAdminClient>;
+type ConnectedAccountRow = Database["public"]["Tables"]["connected_accounts"]["Row"];
+type OAuthCredentialRow = Database["public"]["Tables"]["oauth_credentials"]["Row"];
+const signalTypeSchema = z.enum(["application_status", "other", "job_post", "internship_post", "event", "program", "fellowship", "repo_update", "social_post", "newsletter_item", "calendar_event"]);
+const sourceTypeSchema = z.enum(["github_repo", "company_careers_page", "greenhouse_board", "lever_board", "ashby_board", "school_event_calendar", "newsletter", "social_account", "community_page", "manual_list", "email_application_status", "application_portal", "calendar_events"]);
 
-async function accessToken(admin: Admin, account: Record<string, unknown>, credential: Record<string, unknown>) {
+async function accessToken(admin: Admin, account: ConnectedAccountRow, credential: OAuthCredentialRow) {
   const encrypted = String(credential.encrypted_access_token ?? "");
   const expiresAt = credential.expires_at ? new Date(String(credential.expires_at)).getTime() : Number.POSITIVE_INFINITY;
   if ((account.provider === "gmail" || account.provider === "google_calendar") && expiresAt < Date.now() + 60_000) {
@@ -23,10 +29,14 @@ async function accessToken(admin: Admin, account: Record<string, unknown>, crede
 }
 
 async function createSignalOnce(admin: Admin, userId: string, provider: string, externalType: string, externalId: string, signal: Record<string, unknown>) {
-  const { error } = await admin.from("external_refs").insert({ user_id: userId, status: "active", provider, external_type: externalType, external_id: externalId, payload: signal, last_seen_at: new Date().toISOString(), created_by: "system", updated_by: "system" });
-  if (error?.code === "23505") { await admin.from("external_refs").update({ payload: signal, last_seen_at: new Date().toISOString(), updated_by: "system" }).eq("user_id", userId).eq("provider", provider).eq("external_type", externalType).eq("external_id", externalId); return false; }
+  const { error } = await admin.from("external_refs").insert({ user_id: userId, status: "active", provider, external_type: externalType, external_id: externalId, payload: toJson(signal), last_seen_at: new Date().toISOString(), created_by: "system", updated_by: "system" });
+  if (error?.code === "23505") { await admin.from("external_refs").update({ payload: toJson(signal), last_seen_at: new Date().toISOString(), updated_by: "system" }).eq("user_id", userId).eq("provider", provider).eq("external_type", externalType).eq("external_id", externalId); return false; }
   if (error) throw new Error(error.message);
-  await admin.from("signals").insert({ user_id: userId, title: String(signal.title ?? externalType), status: "new", signal_type: signal.signalType ?? "other", source_type: signal.sourceType ?? null, source_url: signal.url ?? null, external_ref: externalId, posted_at: signal.postedAt ?? null, raw_payload: signal.rawPayload ?? {}, normalized_payload: signal, parser_name: `${provider}-connector`, parser_confidence: "high", rationale: "Read-only connector signal", created_by: "system", updated_by: "system" });
+  const signalType = signalTypeSchema.catch("other").parse(signal.signalType);
+  const sourceTypeResult = sourceTypeSchema.safeParse(signal.sourceType);
+  const sourceUrl = typeof signal.url === "string" ? signal.url : null;
+  const postedAt = typeof signal.postedAt === "string" ? signal.postedAt : null;
+  await admin.from("signals").insert({ user_id: userId, title: String(signal.title ?? externalType), status: "new", signal_type: signalType, source_type: sourceTypeResult.success ? sourceTypeResult.data : null, source_url: sourceUrl, external_ref: externalId, posted_at: postedAt, raw_payload: toJson(signal.rawPayload ?? {}), normalized_payload: toJson(signal), parser_name: `${provider}-connector`, parser_confidence: "high", rationale: "Read-only connector signal", created_by: "system", updated_by: "system" });
   return true;
 }
 

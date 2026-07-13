@@ -49,6 +49,22 @@ export default async function WorkerSettingsPage() {
           <WorkerPairingPanel appUrl={getServerEnv().CAREER_OS_APP_URL} />
         </CardContent>
       </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Dedicated source browser</CardTitle>
+          <CardDescription>
+            The installer creates a desktop shortcut named Career OS Browser.
+            Use that shortcut for Instagram, Handshake, LinkedIn, and portal
+            sign-ins so Career OS can reuse the authenticated read-only profile.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          Career OS tries sources automatically. This page will direct you here
+          only when a login, MFA, CAPTCHA, consent, or school SSO screen truly
+          needs you. Finish that screen in the dedicated browser, close or leave
+          it open, then choose Retry now on the onboarding source card.
+        </CardContent>
+      </Card>
       <div className="space-y-4">
         {devices?.map((device) => {
           const online = isWorkerOnline(device);
