@@ -1,4 +1,5 @@
 import { AlertCircle, Check, ChevronRight } from "lucide-react";
+import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -299,9 +300,12 @@ export default async function OnboardingPage() {
             ))}
             {step === 2 ? (
               <Button asChild variant="outline">
-                <a href="/settings/worker">Open worker setup</a>
+                <Link href="/settings/worker">Open worker setup</Link>
               </Button>
             ) : null}
+            {step === 7 || step === 8 || step === 9 ? <Button asChild variant="outline"><Link href="/resumes">Open resume & experience library</Link></Button> : null}
+            {step === 10 ? <Button asChild variant="outline"><Link href="/settings">Connect Gmail, Calendar & GitHub</Link></Button> : null}
+            {step === 11 ? <Button asChild variant="outline"><Link href="/settings/worker">Review dedicated browser profile health</Link></Button> : null}
             <div className="flex justify-between border-t pt-5">
               <p className="text-xs text-muted-foreground">
                 {session.completed_steps.length} steps saved

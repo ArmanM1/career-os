@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireServerSecret } from "@/lib/env";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { enqueueSystemEmail } from "@/lib/notification-outbox";
 
 export async function GET(request: Request) {
   if (request.headers.get("authorization") !== `Bearer ${requireServerSecret("CRON_SECRET")}`) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -23,5 +24,11 @@ export async function GET(request: Request) {
   }
   if (evidence?.length) await admin.from("evidence").update({ status: "expired", expired_at: now, updated_by: "system" }).in("id", evidence.map((item) => item.id));
   await admin.rpc("recover_stale_agent_jobs");
-  return NextResponse.json({ expiredStateItems: expiredCount ?? 0, expiredEvidence: evidence?.length ?? 0, removedArtifacts, checkedAt: now });
+  const offlineBefore = new Date(Date.now() - 120_000).toISOString();
+  const { data: offlineDevices } = await admin.from("worker_devices").select("id,user_id,name,last_heartbeat_at").eq("status", "online").lt("last_heartbeat_at", offlineBefore);
+  for (const device of offlineDevices ?? []) {
+    await admin.from("worker_devices").update({ status: "offline", updated_by: "system" }).eq("id", device.id).eq("status", "online");
+    await enqueueSystemEmail(admin, { userId: device.user_id, category: "worker_failure", severity: "urgent", idempotencyKey: `worker-offline:${device.id}:${now.slice(0, 10)}`, subject: `${device.name} is offline`, body: "Career OS has not received a worker heartbeat. Queued work will wait until it reconnects.", actionUrl: "/settings/system-health", actionLabel: "Review worker" });
+  }
+  return NextResponse.json({ expiredStateItems: expiredCount ?? 0, expiredEvidence: evidence?.length ?? 0, removedArtifacts, offlineWorkers: offlineDevices?.length ?? 0, checkedAt: now });
 }

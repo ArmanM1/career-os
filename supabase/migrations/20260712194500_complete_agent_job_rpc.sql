@@ -61,6 +61,10 @@ begin
       'agent',
       'agent'
     ) on conflict (id) do nothing;
+    if mutation_item->>'approvalPolicy' = 'approval_required' then
+      insert into public.approval_requests(user_id,agent_run_id,title,status,action_type,target_object_type,target_object_id,rationale,risk_level,payload,evidence_ids,created_by,updated_by)
+      values(job.user_id,run_id,coalesce(mutation_item->'payload'->>'title',replace(mutation_item->>'mutationType','_',' ')),'pending',mutation_item->>'mutationType',mutation_item->>'targetObjectType',nullif(mutation_item->>'targetObjectId','')::uuid,coalesce(mutation_item->>'rationale',''),case when mutation_item->>'mutationType'='sensitive_data.delete.request' then 'high'::public.risk_level else 'medium'::public.risk_level end,coalesce(mutation_item->'payload','{}'::jsonb) || jsonb_build_object('proposedMutationId',mutation_item->>'id'),coalesce(array(select jsonb_array_elements_text(coalesce(mutation_item->'evidenceIds','[]'::jsonb)))::uuid[],'{}'),'agent','agent');
+    end if;
   end loop;
 
   for approval_item in select * from jsonb_array_elements(coalesce(p_output->'approvalRequests', '[]'::jsonb)) loop

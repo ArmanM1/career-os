@@ -2,6 +2,7 @@ import { z } from "zod";
 import { agentDefinitions, type AgentId } from "./agents";
 import { agentOutputSchema, type AgentOutput } from "./schemas";
 import { mutationRegistry, type MutationType } from "./mutation-registry";
+import { decideMutation } from "./mutations";
 
 export const agentCapabilitySchema = z.enum(["read_state", "propose_mutations", "enqueue_jobs", "read_files", "write_workspace", "run_adapter", "browser_read", "browser_fill_after_approval", "latex_compile"]);
 export type AgentCapability = z.infer<typeof agentCapabilitySchema>;
@@ -76,5 +77,12 @@ export function enforceAgentOutputContract(agentId: string, output: AgentOutput)
   const schema = agentSchemas[agentId as AgentId]?.output;
   if (!schema) return { output: { ...output, proposedMutations: [], warnings: [...output.warnings, `Missing contract for ${agentId}`] }, warnings: [`Missing contract for ${agentId}`] };
   const parsed = schema.parse(output);
-  return { output: parsed, warnings: parsed.warnings };
+  const proposedMutations = parsed.proposedMutations.map((mutation) => {
+    const entry = mutationRegistry[mutation.mutationType as MutationType];
+    if (!entry || !entry.owners.includes(agentId as AgentId)) throw new Error(`${agentId} cannot own ${mutation.mutationType}`);
+    const decision = decideMutation(mutation);
+    if (decision.action === "reject") throw new Error(decision.reason);
+    return decision.mutation;
+  });
+  return { output: { ...parsed, proposedMutations }, warnings: parsed.warnings };
 }

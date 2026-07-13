@@ -5,8 +5,11 @@ import {
   validateAgentJobInput,
 } from "@career-os/core";
 import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import {
   loadDeviceCredentials,
   saveDeviceCredentials,
@@ -79,6 +82,7 @@ async function main() {
         health: await collectHealth(repoRoot),
       });
       await gateway.tickSchedules();
+      try { await gateway.dispatchNotifications(); } catch (error) { log("warn", "notifications.dispatch_failed", { message: error instanceof Error ? error.message : String(error) }); }
       const { accounts } = await gateway.dueConnectors();
       for (const account of accounts) {
         try {
@@ -169,6 +173,7 @@ async function processJob(
   repoRoot: string,
   job: ClaimedJob,
 ) {
+  await synchronizeJobArtifact(gateway, job);
   const agent = getAgentDefinition(job.agent_id);
   if (!agent)
     return gateway.fail(job.id, `Unknown agent ${job.agent_id}`, false);
@@ -257,6 +262,24 @@ async function processJob(
   } finally {
     clearInterval(leaseHeartbeat);
   }
+}
+
+async function synchronizeJobArtifact(gateway: WorkerGatewayClient, job: ClaimedJob) {
+  const storagePath = typeof job.input.storagePath === "string" ? job.input.storagePath : null;
+  const artifactId = typeof job.input.artifactId === "string" ? job.input.artifactId : null;
+  if (!storagePath || !artifactId || job.input.localPath) return;
+  const { signedUrl } = await gateway.artifactDownloadUrl("resume-sources", storagePath);
+  const response = await fetch(signedUrl, { signal: AbortSignal.timeout(60_000) });
+  if (!response.ok) throw new Error(`Artifact download failed (${response.status})`);
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (bytes.length > 50 * 1024 * 1024) throw new Error("Artifact exceeds the 50 MB worker synchronization limit.");
+  const fileName = storagePath.split("/").pop()?.replace(/[^a-zA-Z0-9._-]+/g, "-") || `${artifactId}.bin`;
+  const localPath = resolve(process.env.LOCALAPPDATA ?? tmpdir(), "CareerOS", "workspace", "resume-sources", artifactId, fileName);
+  await mkdir(dirname(localPath), { recursive: true });
+  await writeFile(localPath, bytes);
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  await gateway.artifactSynced(artifactId, sha256, localPath);
+  job.input.localPath = localPath;
 }
 
 async function collectHealth(repoRoot: string) {

@@ -15,10 +15,13 @@ export function decideMutation(input: ProposedMutation): MutationDecision {
   if (!entry) return { action: "reject", mutation, reason: "Mutation type is not registered." };
   const payload = entry.payloadSchema.safeParse(mutation.payload);
   if (!payload.success) return { action: "reject", mutation, reason: `Mutation payload is invalid: ${payload.error.message}` };
+  const parsedPayload = payload.data as Record<string, unknown>;
   if (entry.idempotency === "required" && !mutation.idempotencyKey) return { action: "reject", mutation, reason: "Mutation requires an idempotency key." };
-  if (entry.idempotency === "target_version" && !mutation.expectedObjectVersion) return { action: "approval_required", mutation, reason: "Target version is required before this mutation can apply." };
-  if (entry.approvalPolicy === "approval_required" || mutation.approvalPolicy !== "auto_apply") return { action: "approval_required", mutation, reason: "This mutation requires explicit approval." };
-  return { action: "auto_apply", mutation };
+  const normalized = { ...mutation, payload: parsedPayload };
+  if (entry.idempotency === "target_version" && !mutation.expectedObjectVersion) return { action: "approval_required", mutation: { ...normalized, approvalPolicy: "approval_required" }, reason: "Target version is required before this mutation can apply." };
+  if (mutation.mutationType === "application_status.record" && parsedPayload.confidence !== "high") return { action: "approval_required", mutation: { ...normalized, approvalPolicy: "approval_required" }, reason: "Only explicit high-confidence application status evidence may auto-apply." };
+  if (entry.approvalPolicy === "approval_required" || mutation.approvalPolicy !== "auto_apply") return { action: "approval_required", mutation: { ...normalized, approvalPolicy: "approval_required" }, reason: "This mutation requires explicit approval." };
+  return { action: "auto_apply", mutation: { ...normalized, approvalPolicy: "auto_apply" } };
 }
 
 export const mutationResultSchema = z.object({

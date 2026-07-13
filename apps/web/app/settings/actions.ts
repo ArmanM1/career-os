@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Cron } from "croner";
 import { getServerEnv, requireServerSecret } from "@/lib/env";
 import { decryptOAuthToken } from "@/lib/oauth-crypto";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -21,4 +22,21 @@ export async function disconnectConnector(accountId: string) {
   await supabase.from("connected_accounts").update({ status: "disabled", scopes: [], updated_by: "user" }).eq("id", account.id).eq("user_id", user.id);
   await supabase.from("audit_log_entries").insert({ user_id: user.id, action_type: "connector.disconnected", target_object_type: "connected_account", target_object_id: account.id, summary: `${account.provider} disconnected`, created_by: "user", updated_by: "user" });
   revalidatePath("/settings");
+}
+
+export async function setNotificationPreference(category: string, enabled: boolean) {
+  const { supabase, user } = await requireUser();
+  await supabase.from("notification_preferences").upsert({ user_id: user.id, category, channel: "email", enabled, minimum_severity: "important", status: "active", created_by: "user", updated_by: "user" }, { onConflict: "user_id,category,channel" });
+  revalidatePath("/settings");
+}
+
+export async function updateTimezone(formData: FormData) {
+  const timezone = String(formData.get("timezone") ?? "").trim();
+  try { new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(); } catch { throw new Error("Enter a valid IANA timezone such as America/Denver."); }
+  const { supabase, user } = await requireUser();
+  await supabase.from("profiles").update({ timezone, updated_by: "user" }).eq("user_id", user.id);
+  const { data: schedules } = await supabase.from("schedules").select("id,cron_expression").eq("user_id", user.id).eq("status", "active");
+  for (const schedule of schedules ?? []) await supabase.from("schedules").update({ timezone, next_run_at: schedule.cron_expression ? new Cron(schedule.cron_expression, { timezone }).nextRun()?.toISOString() ?? null : null, updated_by: "user" }).eq("id", schedule.id).eq("user_id", user.id);
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
 }

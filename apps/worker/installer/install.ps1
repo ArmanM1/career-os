@@ -28,7 +28,8 @@ $chromeCandidates = @(
   "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
   "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"
 )
-if (-not ($chromeCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1)) { throw "Google Chrome is required." }
+$chromePath = $chromeCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if (-not $chromePath) { throw "Google Chrome is required." }
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\..\.."))
 $sourceRoot = Join-Path $InstallRoot "runtime"
@@ -80,4 +81,5 @@ $settings = New-ScheduledTaskSettingsSet -RestartCount 10 -RestartInterval (New-
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
 Register-ScheduledTask -TaskName "Career OS Worker" -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null
 Start-ScheduledTask -TaskName "Career OS Worker"
-Write-Output "Career OS worker installed, paired, and started."
+Start-Process -FilePath $chromePath -ArgumentList @("--user-data-dir=`"$(Join-Path $InstallRoot 'chrome-profile')`"", "https://www.instagram.com/")
+Write-Output "Career OS worker installed, paired, and started. A dedicated Chrome profile was opened so you can sign in to configured sources."

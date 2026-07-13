@@ -14,18 +14,21 @@ This document tracks the accepted first-user production build. It is not a specu
 - Responsive dashboard, threads, opportunities, relationships, events, check-ins, approvals, activity, settings, worker setup, and resumable onboarding surfaces.
 - Read-only Google Gmail/Calendar and GitHub OAuth/sync foundations with encrypted server-side tokens.
 - Resend idempotent outbox delivery, signed webhook updates, and daily retention/state-expiry maintenance cron.
+- Private artifact upload/download URLs, checksum-verified local synchronization, and workspace-confined agent artifact uploads.
+- Scheduled connector dispatch with downstream review jobs, source-signal opportunity jobs, operational notification producers, and user notification/timezone controls.
+- Registry-owned approval enforcement at the worker completion boundary, including review-only ambiguous application status changes and transactional approval creation.
 - CI definitions for typecheck, lint, unit, audit, build, local migrations/RLS, and desktop/mobile Playwright checks.
 
 ## Remaining before production acceptance
 
-1. Complete artifact upload/sync and production-grade resume extraction, verified experience review, `latexmk` compilation, diff, and mobile PDF workflow.
+1. Complete production-grade resume extraction, verified experience review, `latexmk` compilation, diff, and mobile PDF workflow.
 2. Complete dedicated Chrome-profile workflows for Instagram stories, Handshake, LinkedIn targeted contact lookup, portal status checks, and approved form preparation using saved CI fixtures.
-3. Finish connector cursors, scheduled connector dispatch, manual resync/health UI, and production OAuth configuration.
+3. Finish connector cursors, manual resync/health UI, and production OAuth configuration.
 4. Finish source health sections, source discovery UI, authenticated-source enablement, and adapter repair/review workflow.
 5. Finish application packet/status UI and execute the complete opportunity → resume → project spec → referral → approved form-fill → manual submit path.
 6. Finish relationship/contact imports, interaction stages, event attendance/notes, and opportunity-triggered relationship reprioritization.
 7. Add thread rename/search/attachments/stop/retry/branch/context inspector and richer message-part rendering.
-8. Add notification preference/producer logic, export/deletion flows, system-health metrics, backup/restore automation, and runbooks.
+8. Add export/deletion flows, deeper system-health metrics, backup/restore automation, and runbooks.
 9. Expand database/runtime/source/browser/golden-path tests to the full acceptance matrix.
 10. Provision staging Vercel/Supabase/OAuth/Resend, apply migrations to staging, run the golden path, then migrate production using the verified backup and archive strategy.
 

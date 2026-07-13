@@ -2,6 +2,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { isAbsolute, relative, resolve } from "node:path";
 import { loadDeviceCredentials } from "./device-credentials";
 import { readWorkerEnv } from "./env";
 import { WorkerGatewayClient } from "./gateway-client";
@@ -18,9 +21,27 @@ function result(value: unknown) {
 
 function register(name: string, description: string, inputSchema: Record<string, z.ZodType>, annotations: typeof readOnly | typeof proposal) {
   server.registerTool(name, { description, inputSchema, annotations }, async (input) => {
+    if (name === "career.artifact.create") await uploadLocalArtifact(input as Record<string, unknown>);
     const response = await gateway.mcp(name, input as Record<string, unknown>);
     return result(response.result);
   });
+}
+
+async function uploadLocalArtifact(input: Record<string, unknown>) {
+  const localPathValue = typeof input.localPath === "string" ? input.localPath : null;
+  if (!localPathValue) return;
+  const workspace = resolve(env.dataDir, "workspace");
+  const localPath = isAbsolute(localPathValue) ? resolve(localPathValue) : resolve(workspace, localPathValue);
+  const rel = relative(workspace, localPath);
+  if (rel.startsWith("..") || isAbsolute(rel)) throw new Error("Artifact upload path is outside the Career OS workspace.");
+  const bytes = await readFile(localPath);
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  if (typeof input.sha256 !== "string" || input.sha256.toLowerCase() !== sha256) throw new Error("Artifact checksum does not match the local file.");
+  const bucket = String(input.bucket ?? "");
+  const storagePath = String(input.storagePath ?? "");
+  const upload = await gateway.artifactUploadUrl(bucket, storagePath);
+  const response = await fetch(upload.signedUrl, { method: "PUT", headers: { "content-type": String(input.mimeType ?? "application/octet-stream"), "x-upsert": "false" }, body: bytes, signal: AbortSignal.timeout(60_000) });
+  if (!response.ok) throw new Error(`Artifact upload failed (${response.status}).`);
 }
 
 register("career.state.current", "Read the freshly assembled, versioned CurrentStateBundle for this user.", {}, readOnly);
@@ -67,7 +88,7 @@ register("career.evidence.create", "Create a provenance record for an observed f
 }, proposal);
 
 register("career.artifact.create", "Register an already-uploaded private artifact inside the user's storage namespace.", {
-  title: z.string().min(1), artifactType: z.string().min(1), bucket: z.enum(["resume-sources", "resume-artifacts", "thread-attachments", "evidence", "exports"]), storagePath: z.string().min(1), localPath: z.string().optional(), mimeType: z.string().optional(), sizeBytes: z.number().int().nonnegative().optional(), sha256: z.string().regex(/^[a-f0-9]{64}$/i), origin: z.string().min(1), retentionPolicy: z.string().default("canonical"),
+  title: z.string().min(1), artifactType: z.string().min(1), bucket: z.enum(["resume-sources", "resume-artifacts", "thread-attachments", "evidence", "exports"]), storagePath: z.string().min(1), localPath: z.string().min(1), mimeType: z.string().optional(), sizeBytes: z.number().int().nonnegative().optional(), sha256: z.string().regex(/^[a-f0-9]{64}$/i), origin: z.string().min(1), retentionPolicy: z.string().default("canonical"),
 }, proposal);
 
 register("career.jobs.enqueue", "Enqueue a typed downstream Career OS agent job.", {

@@ -1,6 +1,7 @@
 import { ArrowRight, Cable, Laptop, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Card,
   CardContent,
@@ -9,12 +10,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { requireUser } from "@/lib/supabase/server";
-import { disconnectConnector } from "./actions";
+import { disconnectConnector, setNotificationPreference, updateTimezone } from "./actions";
 
 export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   const { supabase, user } = await requireUser();
-  const [{ data: profile }, { data: accounts }, { data: devices }] =
+  const [{ data: profile }, { data: accounts }, { data: devices }, { data: preferences }] =
     await Promise.all([
       supabase
         .from("profiles")
@@ -30,6 +31,7 @@ export default async function SettingsPage() {
         .select("status")
         .eq("user_id", user.id)
         .neq("status", "revoked"),
+      supabase.from("notification_preferences").select("category,enabled").eq("user_id", user.id).eq("channel", "email"),
     ]);
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -116,12 +118,9 @@ export default async function SettingsPage() {
               Schedules run in your local timezone.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="font-mono text-sm">
-              {profile?.timezone ?? "America/Denver"}
-            </p>
-          </CardContent>
+          <CardContent><form action={updateTimezone} className="flex gap-2"><Input name="timezone" defaultValue={profile?.timezone ?? "America/Denver"} aria-label="Timezone" /><Button type="submit" variant="outline">Save</Button></form></CardContent>
         </Card>
+        <Card><CardHeader><CardTitle>Email notifications</CardTitle><CardDescription>Urgent operational alerts and high-value career actions. The full morning brief stays in the dashboard.</CardDescription></CardHeader><CardContent className="space-y-2">{["high_value_opportunity", "approval", "connector_failure", "source_failure", "worker_failure"].map((category) => { const preference = preferences?.find((item) => item.category === category); const enabled = preference?.enabled ?? true; return <div key={category} className="flex items-center justify-between rounded-lg border p-3 text-sm"><span>{category.replaceAll("_", " ")}</span><form action={setNotificationPreference.bind(null, category, !enabled)}><Button type="submit" size="sm" variant={enabled ? "outline" : "ghost"}>{enabled ? "Enabled" : "Disabled"}</Button></form></div>; })}</CardContent></Card>
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

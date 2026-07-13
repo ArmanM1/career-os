@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authenticateWorker, workerUnauthorized } from "@/lib/worker-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { enqueueSystemEmail } from "@/lib/notification-outbox";
 
 const signalSchema = z.object({ title: z.string(), signalType: z.enum(["job_post", "internship_post", "event", "program", "fellowship", "repo_update", "social_post", "newsletter_item", "other"]), sourceUrl: z.url().optional(), canonicalUrl: z.url().optional(), externalRef: z.string().optional(), companyName: z.string().optional(), roleTitle: z.string().optional(), location: z.string().optional(), opportunityType: z.enum(["job", "internship", "event", "program", "fellowship", "competition", "other"]).optional(), postedAt: z.string().datetime().optional(), deadlineAt: z.string().datetime().optional(), payload: z.record(z.string(), z.unknown()).default({}) });
 const inputSchema = z.object({ status: z.enum(["success", "no_change", "failed", "auth_required"]), signals: z.array(signalSchema).max(1000).default([]), parserVersion: z.string().max(80).optional(), error: z.string().max(4000).optional(), evidence: z.record(z.string(), z.unknown()).default({}) });
@@ -14,6 +15,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const evidenceId = crypto.randomUUID(); await admin.from("evidence").insert({ id: evidenceId, user_id: device.userId, title: `Source evidence: ${monitor.title}`, status: "active", source_type: "source_run", source_url: monitor.url, external_ref: run.id, payload: parsed.data.evidence, retention_policy: "raw_30_days", expires_at: new Date(Date.now() + 30 * 86400_000).toISOString(), created_by: "system", updated_by: "system" });
   let created = 0; for (const signal of parsed.data.signals) { if (signal.canonicalUrl) { const { data: existing } = await admin.from("signals").select("id").eq("user_id", device.userId).eq("canonical_url", signal.canonicalUrl).maybeSingle(); if (existing) continue; } const { error } = await admin.from("signals").insert({ user_id: device.userId, source_monitor_id: id, source_run_id: run.id, title: signal.title, status: "new", signal_type: signal.signalType, source_type: monitor.source_type, source_url: signal.sourceUrl ?? monitor.url, canonical_url: signal.canonicalUrl, external_ref: signal.externalRef, company_name: signal.companyName, role_title: signal.roleTitle, location: signal.location, opportunity_type: signal.opportunityType, posted_at: signal.postedAt, deadline_at: signal.deadlineAt, raw_payload: signal.payload, normalized_payload: signal, parser_name: parsed.data.parserVersion ?? monitor.parser_version, parser_confidence: "high", rationale: "Deterministic source adapter extraction", evidence_ids: [evidenceId], created_by: "system", updated_by: "system" }); if (!error) created += 1; }
   await admin.from("source_runs").update({ new_signal_count: created, status: created ? "success" : runStatus, updated_by: "system" }).eq("id", run.id);
+  if (created > 0) await admin.from("agent_jobs").insert({
+    user_id: device.userId,
+    agent_id: "career-opportunity-intelligence",
+    title: `Normalize and rank ${created} signal${created === 1 ? "" : "s"} from ${monitor.title}`,
+    queue: "opportunities",
+    input_type: "opportunity.rank",
+    input: { schemaVersion: 1, type: "opportunity.rank", sourceRunId: run.id, sourceMonitorId: monitor.id, signalCount: created },
+    related_object_ids: [run.id, monitor.id],
+    required_capabilities: [],
+    priority: 75,
+    scheduled_for: now,
+    dedupe_key: `opportunity-rank:source-run:${run.id}`,
+    created_by: "system",
+    updated_by: "system",
+  });
   const failures = parsed.data.status === "failed" ? monitor.consecutive_failures + 1 : 0; const status = parsed.data.status === "auth_required" ? "auth_required" : failures >= 3 ? "broken" : monitor.status; await admin.from("source_monitors").update({ status, claimed_by_device_id: null, lease_expires_at: null, last_run_at: now, next_run_at: nextRun(monitor.metadata, monitor.schedule), consecutive_failures: failures, useful_signal_count: monitor.useful_signal_count + created, last_useful_signal_at: created ? now : monitor.last_useful_signal_at, parser_version: parsed.data.parserVersion ?? monitor.parser_version, last_error: parsed.data.error, updated_by: "system" }).eq("id", id);
+  if (status === "auth_required" || status === "broken") await enqueueSystemEmail(admin, { userId: device.userId, category: "source_failure", severity: status === "auth_required" ? "important" : "urgent", idempotencyKey: `source-${status}:${monitor.id}:${now.slice(0, 10)}`, subject: status === "auth_required" ? `${monitor.title} needs sign-in` : `${monitor.title} source is broken`, body: parsed.data.error ?? "Open Career OS to inspect and repair this source.", actionUrl: "/sources", actionLabel: "Review source" });
   return NextResponse.json({ runId: run.id, created });
 }

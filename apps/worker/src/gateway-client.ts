@@ -41,9 +41,11 @@ export class WorkerGatewayClient {
   dueSources() { return this.request<{ monitors: SourceMonitorJob[] }>("/api/worker/sources/due"); }
   dueConnectors() { return this.request<{ accounts: Array<{ id: string; provider: string }> }>("/api/worker/connectors/due"); }
   syncConnector(connectedAccountId: string) { return this.request("/api/worker/connectors/sync", { connectedAccountId }); }
+  dispatchNotifications() { return this.request("/api/worker/notifications/dispatch"); }
   completeSource(id: string, result: unknown) { return this.request(`/api/worker/sources/${id}/complete`, result); }
   artifactDownloadUrl(bucket: string, path: string) { return this.request<{ signedUrl: string }>("/api/worker/artifacts/download-url", { bucket, path, expiresIn: 300 }); }
   artifactUploadUrl(bucket: string, path: string) { return this.request<{ signedUrl: string; token: string; path: string }>("/api/worker/artifacts/upload-url", { bucket, path }); }
+  artifactSynced(artifactId: string, sha256: string, localPath: string) { return this.request("/api/worker/artifacts/synced", { artifactId, sha256, localPath }); }
 }
 
 export async function pairWorker(baseUrl: string, code: string, capabilities: string[]) {
