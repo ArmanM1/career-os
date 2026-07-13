@@ -1,0 +1,4 @@
+interface:
+  display_name: "Career Opportunity Intelligence"
+  short_description: "Rank and explain opportunities"
+  default_prompt: "Normalize, deduplicate, enrich, rank, and explain career opportunities using current state."

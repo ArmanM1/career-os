@@ -1,0 +1,4 @@
+interface:
+  display_name: "Career Daily Weekly Planner"
+  short_description: "Plan daily and weekly action"
+  default_prompt: "Generate state-aware morning briefs, replans, check-ins, and weekly plans."

@@ -12,10 +12,30 @@
     "build": "npm --workspaces --if-present run build",
     "typecheck": "npm --workspaces --if-present run typecheck",
     "lint": "npm --workspaces --if-present run lint",
-    "seed:demo": "npm --workspace @career-os/worker run seed:demo",
-    "supabase:push": "npx supabase db push --workdir C:\\tmp\\career-os-supabase-link"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "supabase:start": "npx supabase start",
+    "supabase:stop": "npx supabase stop",
+    "supabase:reset": "npx supabase db reset",
+    "supabase:types": "npx supabase gen types typescript --local --schema public > packages/db/src/database.types.ts",
+    "supabase:push": "npx supabase db push"
   },
   "engines": {
-    "node": ">=20"
+    "node": "24.13.1",
+    "npm": ">=11.8.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.2",
+    "@vitest/coverage-v8": "4.1.10",
+    "jsdom": "26.1.0",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  },
+  "overrides": {
+    "postcss": "8.5.10"
   }
 }

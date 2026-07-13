@@ -2,57 +2,41 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 export type WorkerEnv = {
-  supabaseUrl: string;
-  serviceRoleKey: string;
+  gatewayUrl: string;
   pollMs: number;
   runtime: "codex-app-server" | "mock";
+  dataDir: string;
 };
 
 function loadEnvFile(path: string) {
   const absolutePath = resolve(process.cwd(), path);
   if (!existsSync(absolutePath)) return;
-
   const lines = readFileSync(absolutePath, "utf8").replace(/^\uFEFF/, "").split(/\r?\n/);
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) continue;
-
     const separatorIndex = trimmed.indexOf("=");
     if (separatorIndex === -1) continue;
-
     const key = trimmed.slice(0, separatorIndex).trim();
     const value = trimmed.slice(separatorIndex + 1).trim().replace(/^["']|["']$/g, "");
     process.env[key] ??= value;
   }
 }
 
-function loadLocalEnv() {
+export function readWorkerEnv(): WorkerEnv {
   loadEnvFile(".env.local");
   loadEnvFile(".env");
   loadEnvFile("../../.env.local");
   loadEnvFile("../../.env");
-}
-
-export function readWorkerEnv(): WorkerEnv {
-  loadLocalEnv();
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const gatewayUrl = process.env.CAREER_OS_GATEWAY_URL ?? "http://localhost:3000";
   const pollMs = Number(process.env.CAREER_OS_WORKER_POLL_MS ?? "10000");
-  const runtime = (process.env.CAREER_OS_RUNTIME ?? "codex-app-server") as WorkerEnv["runtime"];
-
-  if (!supabaseUrl || supabaseUrl.includes("replace-with")) {
-    throw new Error("NEXT_PUBLIC_SUPABASE_URL is required for the worker.");
-  }
-
-  if (!serviceRoleKey || serviceRoleKey.includes("replace-with")) {
-    throw new Error("SUPABASE_SERVICE_ROLE_KEY is required for the worker.");
-  }
-
+  const runtime = process.env.CAREER_OS_RUNTIME === "mock" ? "mock" : "codex-app-server";
+  const localAppData = process.env.LOCALAPPDATA;
+  if (!localAppData) throw new Error("LOCALAPPDATA is required on the paired Windows worker.");
   return {
-    supabaseUrl,
-    serviceRoleKey,
-    pollMs: Number.isFinite(pollMs) ? pollMs : 10000,
-    runtime: runtime === "mock" ? "mock" : "codex-app-server",
+    gatewayUrl: gatewayUrl.replace(/\/$/, ""),
+    pollMs: Number.isFinite(pollMs) && pollMs >= 1000 ? pollMs : 10000,
+    runtime,
+    dataDir: resolve(process.env.CAREER_OS_DATA_DIR ?? localAppData, "CareerOS"),
   };
 }

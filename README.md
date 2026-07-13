@@ -1,65 +1,51 @@
 # Career OS
 
-Career OS is a local-first, agent-assisted career momentum system. It is being built first for one user, with a durable architecture that can later support other agent runtimes.
+Career OS is a web-first, proactive career progression system. It maintains a living, inspectable understanding of the user's goals, recruiting season, thoughts, feelings, energy, completed work, applications, relationships, experiences, and next steps so the user can apply to more opportunities with stronger resumes, projects, events, mentors, and referral paths.
 
-The project is not a generic career product. It is a personal operating system for maintaining momentum across goals, applications, mentors, events, resumes, projects, and weekly action items.
+The primary loop is:
 
-## Current Direction
+`Understand → Discover → Prioritize → Prepare → Connect → Execute → Track → Reflect → Adapt`
 
-- Hosted web UI for access from desktop and phone.
-- Supabase-hosted Postgres/Auth/Realtime as the shared state layer.
-- Local home agent worker running on the user's computer.
-- Codex App Server as the first agent runtime.
-- Agent runtime adapter layer so Claude Code, OpenHands, or other runtimes can be added later.
-- Agents write through a Career OS object and mutation contract, not arbitrary database edits.
-- Human approval is required for externally visible or irreversible actions, including sending messages and submitting applications.
+The responsive Next.js UI is the complete end-user interface. Supabase owns authenticated canonical state. A paired Windows worker runs the user's authenticated Codex installation, deterministic monitors, dedicated browser profile, artifact sync, and LaTeX compilation through a revocable gateway. The worker never receives database service credentials.
 
-## Key Docs
+## Product boundaries
 
-- [Architecture v1](docs/ARCHITECTURE.md)
-- [Career OS contract](docs/CAREER_OS_CONTRACT.md)
-- [Candidate object catalog](docs/OBJECT_CATALOG.md)
-- [Agents and routing](docs/AGENTS_AND_ROUTING.md)
-- [Source monitors and job search](docs/SOURCE_MONITORS.md)
-- [Job Sourcing agent spec](docs/JOB_SOURCING_AGENT_SPEC.md)
-- [Opportunity Ranking agent spec](docs/OPPORTUNITY_RANKING_AGENT_SPEC.md)
-- [Resume library](docs/RESUME_LIBRARY.md)
-- [Supabase setup](docs/SUPABASE_SETUP.md)
-- [Roadmap](docs/ROADMAP.md)
+- Draft messages, mentor updates, referral requests, and application answers; never send them.
+- Prepare and fill approved application forms; never press final submit.
+- Generate verified-fact LaTeX resume variants without approval.
+- Generate role-specific project specifications; do not automatically build projects.
+- Read configured authenticated sources after one-time enablement; never bypass CAPTCHA, MFA, access controls, or account restrictions.
+- Keep Gmail, Calendar, and GitHub connectors read-only.
 
-## First Build Target
+See [Product specification](docs/PRODUCT_SPEC.md), [implementation status](docs/ROADMAP.md), and [architecture](docs/ARCHITECTURE.md).
 
-The first useful version should support:
+## Local development
 
-1. Dynamic onboarding that builds the user's profile, goals, source preferences, and initial application strategy.
-2. A main action dashboard with tasks grouped by practical labels such as job app, mentor, event, resume, project, skill, research, and admin.
-3. Job search and source setup as part of onboarding.
-4. Application pipeline tracking.
-5. Scheduled application status checks using email, calendar, application portals, and other approved sources.
-6. Calendar-aware constraints and event-driven tasks.
-7. College journey awareness, including current year, term, recruiting season, graduation timeline, and date/time context.
-8. Resume library with LaTeX-backed role-specific variants.
-9. Weekly briefing that updates tasks based on goals, applications, events, source monitors, and check-ins.
-10. Codex-backed local agent worker that can run jobs, build scripts, and propose structured database mutations.
-
-## Local Development
+Requirements: Node 24.13.1, Docker Desktop, Supabase CLI, and (for the paired worker) Codex CLI, Chrome, and MiKTeX/`latexmk`.
 
 ```bash
-npm install
+npm ci
+npm run supabase:start
+npm run supabase:reset
 npm run dev
+```
+
+Run the worker after pairing it through `/settings/worker`:
+
+```bash
 npm run worker
 ```
 
-The web app runs from `apps/web`. The local worker runs from `apps/worker` and expects Supabase service credentials in `.env.local`.
-
-Useful commands:
+Release checks:
 
 ```bash
 npm run typecheck
 npm run lint
+npm test
+npm run supabase:types
+npx supabase test db
+npm run test:e2e
 npm run build
-npm run supabase:push
-npm run seed:demo
 ```
 
-`npm run seed:demo` requires `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `CAREER_OS_SEED_USER_ID`.
+Environment variables are documented in `.env.example`. Root `.env.local` is loaded for monorepo local development and remains untracked.

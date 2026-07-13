@@ -17,8 +17,7 @@ function formText(formData: FormData, key: string, fallback = "") {
 }
 
 export async function queueSourceDiscovery(formData: FormData) {
-  const server = createCareerServerClient();
-  if (!server) return;
+  const server = await createCareerServerClient();
 
   const sourceTypes = formData
     .getAll("sourceTypes")
@@ -36,7 +35,7 @@ export async function queueSourceDiscovery(formData: FormData) {
 
   await server.supabase.from("agent_jobs").insert({
     user_id: server.userId,
-    agent_id: "career-job-sourcing",
+    agent_id: "career-source-discovery",
     title: `Source discovery: ${targetSeason}`,
     status: "queued",
     labels: ["source-discovery", targetSeason],
@@ -49,7 +48,8 @@ export async function queueSourceDiscovery(formData: FormData) {
       "Do not post, comment, DM, follow, submit forms, or mutate external account state.",
     ].join("\n"),
     input: {
-      type: "job_sourcing.discover",
+      schemaVersion: 1,
+      type: "source.discover",
       mode: "manual",
       query,
       scope,
@@ -68,6 +68,7 @@ export async function queueSourceDiscovery(formData: FormData) {
     },
     priority: 60,
     scheduled_for: new Date().toISOString(),
+    required_capabilities: browserUseAllowed ? ["browser_read"] : [],
     created_by: "user",
     updated_by: "user",
   });
@@ -77,8 +78,7 @@ export async function queueSourceDiscovery(formData: FormData) {
 }
 
 export async function addKnownGitHubSource(formData: FormData) {
-  const server = createCareerServerClient();
-  if (!server) return;
+  const server = await createCareerServerClient();
 
   const url = formText(formData, "url");
   if (!url) return;
@@ -116,8 +116,7 @@ export async function addKnownGitHubSource(formData: FormData) {
 }
 
 export async function updateSourceMonitorStatus(formData: FormData) {
-  const server = createCareerServerClient();
-  if (!server) return;
+  const server = await createCareerServerClient();
 
   const id = formText(formData, "id");
   const status = formText(formData, "status");

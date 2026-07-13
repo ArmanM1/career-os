@@ -1,87 +1,23 @@
 import { z } from "zod";
-import { ProposedMutation, proposedMutationSchema } from "./schemas";
-
-export const safeAutoApplyMutationTypes = new Set([
-  "evidence.create",
-  "profile.upsert",
-  "academic_context.upsert",
-  "constraint.create",
-  "company.create",
-  "role_target.create",
-  "source_discovery_run.create",
-  "source_discovery_run.update",
-  "source_candidate.create",
-  "signal.create",
-  "opportunity_recommendation.create",
-  "goal.create",
-  "goal.update",
-  "task.create",
-  "task.update",
-  "task.complete",
-  "contact.create",
-  "contact.update",
-  "mentor_relationship.create",
-  "mentor_relationship.update",
-  "event.create",
-  "event.update",
-  "opportunity.create",
-  "application.create",
-  "application.update_metadata",
-  "source_monitor.create_proposal",
-  "source_monitor.update_metadata",
-  "source_monitor.update_health",
-  "agent_job.create",
-  "resume_variant.create",
-  "resume_bullet.create",
-  "experience.create",
-  "project.create",
-  "skill.create",
-  "application_status_check.schedule",
-  "application_status_check.record_result",
-]);
-
-export const approvalRequiredMutationTypes = new Set([
-  "approval_request.create",
-  "application.submit",
-  "message.send",
-  "connected_account.expand_scope",
-  "browser_control.run_authenticated",
-  "goal.change_long_term",
-  "record.delete",
-]);
+import { getMutationRegistryEntry } from "./mutation-registry";
+import { type ProposedMutation, proposedMutationSchema } from "./schemas";
 
 export type MutationDecision =
   | { action: "auto_apply"; mutation: ProposedMutation }
   | { action: "approval_required"; mutation: ProposedMutation; reason: string }
   | { action: "reject"; mutation: ProposedMutation; reason: string };
 
-export function parseProposedMutation(input: unknown): ProposedMutation {
-  return proposedMutationSchema.parse(input);
-}
+export function parseProposedMutation(input: unknown): ProposedMutation { return proposedMutationSchema.parse(input); }
 
 export function decideMutation(input: ProposedMutation): MutationDecision {
   const mutation = proposedMutationSchema.parse(input);
-
-  if (approvalRequiredMutationTypes.has(mutation.mutationType)) {
-    return { action: "approval_required", mutation, reason: "Mutation type is externally visible or irreversible." };
-  }
-
-  if (mutation.approvalPolicy !== "auto_apply") {
-    return { action: "approval_required", mutation, reason: "Agent requested approval." };
-  }
-
-  if (!safeAutoApplyMutationTypes.has(mutation.mutationType)) {
-    return { action: "approval_required", mutation, reason: "Mutation type is not in the safe auto-apply allowlist." };
-  }
-
-  if (mutation.mutationType === "source_monitor.create_proposal" && mutation.payload.status === "active") {
-    return { action: "approval_required", mutation, reason: "New source monitors must start as proposed." };
-  }
-
-  if (mutation.mutationType === "application.update_status" && mutation.evidenceIds.length === 0) {
-    return { action: "approval_required", mutation, reason: "Application status updates require evidence." };
-  }
-
+  const entry = getMutationRegistryEntry(mutation.mutationType);
+  if (!entry) return { action: "reject", mutation, reason: "Mutation type is not registered." };
+  const payload = entry.payloadSchema.safeParse(mutation.payload);
+  if (!payload.success) return { action: "reject", mutation, reason: `Mutation payload is invalid: ${payload.error.message}` };
+  if (entry.idempotency === "required" && !mutation.idempotencyKey) return { action: "reject", mutation, reason: "Mutation requires an idempotency key." };
+  if (entry.idempotency === "target_version" && !mutation.expectedObjectVersion) return { action: "approval_required", mutation, reason: "Target version is required before this mutation can apply." };
+  if (entry.approvalPolicy === "approval_required" || mutation.approvalPolicy !== "auto_apply") return { action: "approval_required", mutation, reason: "This mutation requires explicit approval." };
   return { action: "auto_apply", mutation };
 }
 
@@ -95,13 +31,11 @@ export function classifyMutations(mutations: ProposedMutation[]) {
   const applied: ProposedMutation[] = [];
   const approvalRequired: ProposedMutation[] = [];
   const rejected: Array<{ mutation: ProposedMutation; reason: string }> = [];
-
   for (const mutation of mutations) {
     const decision = decideMutation(mutation);
     if (decision.action === "auto_apply") applied.push(decision.mutation);
-    if (decision.action === "approval_required") approvalRequired.push(decision.mutation);
-    if (decision.action === "reject") rejected.push({ mutation: decision.mutation, reason: decision.reason });
+    else if (decision.action === "approval_required") approvalRequired.push(decision.mutation);
+    else rejected.push({ mutation: decision.mutation, reason: decision.reason });
   }
-
   return mutationResultSchema.parse({ applied, approvalRequired, rejected });
 }

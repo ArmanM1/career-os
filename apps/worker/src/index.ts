@@ -5,269 +5,307 @@ import {
   validateAgentJobInput,
 } from "@career-os/core";
 import { existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
+import {
+  loadDeviceCredentials,
+  saveDeviceCredentials,
+} from "./device-credentials";
 import { readWorkerEnv } from "./env";
-import { persistAgentOutput } from "./mutation-applier";
-import { createRuntime, NeedsUserInputError, RuntimeApprovalRequest, RuntimeEvent } from "./runtime";
-import { createWorkerSupabase } from "./supabase";
-import { runDueApplicationStatusChecks, runDueSourceMonitors } from "./source-monitors";
+import {
+  pairWorker,
+  WorkerGatewayClient,
+  type ClaimedJob,
+} from "./gateway-client";
+import { createRuntime, NeedsUserInputError } from "./runtime";
+import { runSourceAdapter } from "./source-adapters";
+
+const capabilities = [
+  "codex",
+  "filesystem",
+  "latex",
+  "browser",
+  "source-monitor",
+  "artifact-sync",
+];
+
+function log(
+  level: "info" | "error" | "warn",
+  event: string,
+  details: Record<string, unknown> = {},
+) {
+  const sanitized = Object.fromEntries(
+    Object.entries(details).filter(
+      ([key]) => !/secret|token|password|authorization/i.test(key),
+    ),
+  );
+  console[level](
+    JSON.stringify({
+      time: new Date().toISOString(),
+      level,
+      event,
+      ...sanitized,
+    }),
+  );
+}
 
 async function main() {
   const env = readWorkerEnv();
-  const supabase = createWorkerSupabase(env);
-  const runtime = createRuntime(env.runtime);
+  const pairIndex = process.argv.indexOf("--pair");
+  if (pairIndex >= 0) {
+    const code = process.argv[pairIndex + 1];
+    if (!code)
+      throw new Error("Pass the ten-minute pairing code after --pair.");
+    const credentials = await pairWorker(env.gatewayUrl, code, capabilities);
+    saveDeviceCredentials(env.dataDir, credentials);
+    log("info", "worker.paired", { deviceId: credentials.deviceId });
+    return;
+  }
+
+  const credentials = loadDeviceCredentials(env.dataDir);
+  const gateway = new WorkerGatewayClient(env.gatewayUrl, credentials);
   const repoRoot = findRepoRoot();
   const once = process.argv.includes("--once");
-
-  console.log(`Career OS worker started with ${env.runtime} runtime.`);
+  log("info", "worker.started", {
+    runtime: env.runtime,
+    deviceId: credentials.deviceId,
+  });
 
   try {
     do {
-      await runDueApplicationStatusChecks(supabase);
-      await runDueSourceMonitors(supabase);
-      await processOneAgentJob(supabase, runtime, repoRoot);
-
-      if (!once) {
-        await new Promise((resolve) => setTimeout(resolve, env.pollMs));
-      }
-    } while (!once);
-  } finally {
-    if (once) await runtime.dispose?.();
-  }
-}
-
-async function processOneAgentJob(
-  supabase: ReturnType<typeof createWorkerSupabase>,
-  runtime: ReturnType<typeof createRuntime>,
-  repoRoot: string,
-) {
-  const { data: jobs, error } = await supabase
-    .from("agent_jobs")
-    .select("*")
-    .eq("status", "queued")
-    .order("created_at", { ascending: true })
-    .limit(1);
-
-  if (error || !jobs?.length) return;
-
-  const job = jobs[0];
-  const agent = getAgentDefinition(job.agent_id);
-  if (!agent) {
-    await supabase.from("agent_jobs").update({ status: "failed", error_message: `Unknown agent ${job.agent_id}` }).eq("id", job.id);
-    return;
-  }
-
-  const inputValidation = validateAgentJobInput(agent.id, job.input ?? {});
-  if (!inputValidation.ok) {
-    const message = inputValidation.error ?? `Invalid input for ${agent.id}`;
-    await supabase.from("agent_jobs").update({ status: "failed", error_message: message }).eq("id", job.id);
-    return;
-  }
-
-  await supabase.from("agent_jobs").update({ status: "running", locked_at: new Date().toISOString() }).eq("id", job.id);
-
-  const { data: runRows, error: runError } = await supabase
-    .from("agent_runs")
-    .insert({
-      user_id: job.user_id,
-      agent_job_id: job.id,
-      agent_id: agent.id,
-      title: job.title ?? agent.displayName,
-      status: "running",
-      input: job.input ?? {},
-      created_by: "system",
-      updated_by: "system",
-    })
-    .select("*")
-    .limit(1);
-
-  if (runError || !runRows?.length) {
-    await supabase.from("agent_jobs").update({ status: "failed", error_message: runError?.message ?? "Could not create run" }).eq("id", job.id);
-    return;
-  }
-
-  const run = runRows[0];
-  for (const warning of inputValidation.warnings) {
-    await persistEvent(supabase, job.user_id, run.id, {
-      type: "contract_warning",
-      message: warning,
-      payload: { agentId: agent.id, agentJobId: job.id },
-    });
-  }
-
-  const threadTitle = `${agent.displayName}: ${job.title ?? job.id}`;
-  const thread = await startRuntimeThreadOrFail(supabase, runtime, job.id, run.id, {
-    title: threadTitle,
-    agentId: agent.id,
-    cwd: repoRoot,
-  });
-  if (!thread) return;
-
-  const { data: threadRows, error: threadError } = await supabase.from("runtime_threads").insert({
-    user_id: job.user_id,
-    agent_run_id: run.id,
-    provider: thread.provider,
-    runtime_thread_id: thread.id,
-    thread_type: agent.threadPolicy,
-    title: thread.title,
-    status: "active",
-    created_by: "system",
-    updated_by: "system",
-  }).select("*").limit(1);
-
-  if (threadError || !threadRows?.length) {
-    await supabase.from("agent_runs").update({ status: "failed", error_message: threadError?.message ?? "Could not create runtime thread" }).eq("id", run.id);
-    await supabase.from("agent_jobs").update({ status: "failed", error_message: threadError?.message ?? "Could not create runtime thread" }).eq("id", job.id);
-    return;
-  }
-
-  const runtimeThread = threadRows[0];
-  const turnInput = {
-    prompt: job.prompt ?? "",
-    skillPath: agent.skillPath,
-    context: job.input ?? {},
-  };
-  const { data: turnRows, error: turnError } = await supabase.from("runtime_turns").insert({
-    user_id: job.user_id,
-    runtime_thread_id: runtimeThread.id,
-    agent_run_id: run.id,
-    title: job.title ?? agent.displayName,
-    status: "running",
-    input: turnInput,
-    metadata: {
-      agentId: agent.id,
-      agentJobId: job.id,
-    },
-    created_by: "system",
-    updated_by: "system",
-  }).select("*").limit(1);
-
-  if (turnError || !turnRows?.length) {
-    await supabase.from("agent_runs").update({ status: "failed", error_message: turnError?.message ?? "Could not create runtime turn" }).eq("id", run.id);
-    await supabase.from("agent_jobs").update({ status: "failed", error_message: turnError?.message ?? "Could not create runtime turn" }).eq("id", job.id);
-    return;
-  }
-
-  const runtimeTurn = turnRows[0];
-
-  let finalPayload: unknown = null;
-  try {
-    for await (const event of runtime.runTurn({
-      thread,
-      prompt: turnInput.prompt,
-      skillPath: agent.skillPath,
-      context: turnInput.context,
-    })) {
-      await persistEvent(supabase, job.user_id, run.id, event);
-      if (event.type === "turn_started") {
-        const runtimeTurnId = typeof event.payload?.runtimeTurnId === "string" ? event.payload.runtimeTurnId : null;
-        if (runtimeTurnId) {
-          await supabase.from("runtime_turns").update({ runtime_turn_id: runtimeTurnId }).eq("id", runtimeTurn.id);
+      await gateway.heartbeat({
+        workerVersion: "0.3.0",
+        capabilities,
+        health: await collectHealth(repoRoot),
+      });
+      await gateway.tickSchedules();
+      const { accounts } = await gateway.dueConnectors();
+      for (const account of accounts) {
+        try {
+          await gateway.syncConnector(account.id);
+        } catch (error) {
+          log("warn", "connector.sync_failed", {
+            accountId: account.id,
+            provider: account.provider,
+            message: error instanceof Error ? error.message : String(error),
+          });
         }
       }
-      if (event.type === "completed") {
-        finalPayload = event.payload;
+      const { monitors } = await gateway.dueSources();
+      for (const monitor of monitors) {
+        try {
+          await gateway.completeSource(
+            monitor.id,
+            await runSourceAdapter(monitor),
+          );
+        } catch (error) {
+          await gateway.completeSource(monitor.id, {
+            status: "failed",
+            signals: [],
+            error: error instanceof Error ? error.message : String(error),
+            evidence: {},
+          });
+        }
       }
-    }
+      const { jobs } = await gateway.claimJobs(2);
+      const browserJobs = jobs.filter((job) =>
+        job.required_capabilities.some((capability) =>
+          capability.startsWith("browser_"),
+        ),
+      );
+      const latexJobs = jobs.filter(
+        (job) =>
+          !browserJobs.includes(job) &&
+          job.required_capabilities.includes("latex_compile"),
+      );
+      const regularJobs = jobs.filter(
+        (job) => !browserJobs.includes(job) && !latexJobs.includes(job),
+      );
+      await Promise.all([
+        Promise.all(
+          regularJobs.map(async (job) => {
+            const jobRuntime = createRuntime(env.runtime);
+            try {
+              await processJob(gateway, jobRuntime, repoRoot, job);
+            } finally {
+              await jobRuntime.dispose?.();
+            }
+          }),
+        ),
+        (async () => {
+          for (const job of browserJobs) {
+            const jobRuntime = createRuntime(env.runtime);
+            try {
+              await processJob(gateway, jobRuntime, repoRoot, job);
+            } finally {
+              await jobRuntime.dispose?.();
+            }
+          }
+        })(),
+        (async () => {
+          for (const job of latexJobs) {
+            const jobRuntime = createRuntime(env.runtime);
+            try {
+              await processJob(gateway, jobRuntime, repoRoot, job);
+            } finally {
+              await jobRuntime.dispose?.();
+            }
+          }
+        })(),
+      ]);
+      if (!once)
+        await new Promise((resolvePromise) =>
+          setTimeout(resolvePromise, env.pollMs),
+        );
+    } while (!once);
+  } finally {
+    log("info", "worker.stopped");
+  }
+}
 
-    const parsedOutput = agentOutputSchema.parse(finalPayload ?? {});
-    const contractResult = enforceAgentOutputContract(agent.id, parsedOutput);
-    for (const warning of contractResult.warnings) {
-      await persistEvent(supabase, job.user_id, run.id, {
-        type: "contract_warning",
-        message: warning,
-        payload: { agentId: agent.id, agentJobId: job.id },
+async function processJob(
+  gateway: WorkerGatewayClient,
+  runtime: ReturnType<typeof createRuntime>,
+  repoRoot: string,
+  job: ClaimedJob,
+) {
+  const agent = getAgentDefinition(job.agent_id);
+  if (!agent)
+    return gateway.fail(job.id, `Unknown agent ${job.agent_id}`, false);
+  const validation = validateAgentJobInput(agent.id, job.input ?? {});
+  if (!validation.ok)
+    return gateway.fail(
+      job.id,
+      validation.error ?? `Invalid input for ${agent.id}`,
+      false,
+    );
+  for (const warning of validation.warnings)
+    await gateway.event(job.id, "contract_warning", warning, {
+      agentId: agent.id,
+    });
+
+  const leaseHeartbeat = setInterval(() => {
+    void gateway.event(job.id, "heartbeat", "Worker extended the active job lease.").catch((error) => log("warn", "job.heartbeat_failed", { jobId: job.id, message: error instanceof Error ? error.message : String(error) }));
+  }, 60_000);
+  leaseHeartbeat.unref();
+  try {
+    let state = await gateway.currentState();
+    const existingRuntimeThreadId = typeof job.metadata?.runtimeThreadId === "string" ? job.metadata.runtimeThreadId : null;
+    const thread = existingRuntimeThreadId
+      ? await runtime.resumeThread(existingRuntimeThreadId)
+      : await runtime.startThread({ title: `${agent.displayName}: ${job.title}`, agentId: agent.id, cwd: repoRoot });
+    let finalPayload: unknown = null;
+    for await (const event of runtime.runTurn({
+      agentId: agent.id,
+      thread,
+      prompt: job.prompt ?? "",
+      skillPath: agent.skillPath,
+      context: {
+        currentState: state,
+        input: job.input,
+        requiredCapabilities: job.required_capabilities,
+      },
+    })) {
+      await gateway.event(
+        job.id,
+        event.type,
+        event.message,
+        event.payload ?? {},
+      );
+      if (event.type === "completed") finalPayload = event.payload;
+    }
+    const parsed = agentOutputSchema.parse(finalPayload ?? {});
+    let contract = enforceAgentOutputContract(agent.id, parsed);
+    const latestState = await gateway.currentState();
+    if (latestState.stateVersion !== state.stateVersion) {
+      await gateway.event(job.id, "contract_warning", "Career state changed during this run; revalidating proposed mutations against the latest state.", { previousStateVersion: state.stateVersion, latestStateVersion: latestState.stateVersion });
+      let revalidatedPayload: unknown = null;
+      for await (const event of runtime.runTurn({
+        agentId: agent.id,
+        thread,
+        prompt: `Career OS state changed while you were working. Revalidate the prior structured output against the new CurrentStateBundle. Return the complete revised output and preserve only still-correct mutations.\n\nPrior output:\n${JSON.stringify(contract.output)}`,
+        skillPath: agent.skillPath,
+        context: { currentState: latestState, input: job.input, requiredCapabilities: job.required_capabilities, revalidation: true },
+      })) {
+        await gateway.event(job.id, event.type, event.message, event.payload ?? {});
+        if (event.type === "completed") revalidatedPayload = event.payload;
+      }
+      contract = enforceAgentOutputContract(agent.id, agentOutputSchema.parse(revalidatedPayload ?? {}));
+      state = latestState;
+    }
+    for (const warning of contract.warnings)
+      await gateway.event(job.id, "contract_warning", warning, {
+        agentId: agent.id,
       });
-    }
-
-    await persistAgentOutput(supabase, { userId: job.user_id, agentRunId: run.id }, contractResult.output);
-    await supabase.from("runtime_turns").update({ status: "completed", output: contractResult.output }).eq("id", runtimeTurn.id);
-    await supabase.from("agent_runs").update({ status: "completed", output: contractResult.output }).eq("id", run.id);
-    await supabase.from("agent_jobs").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", job.id);
-  } catch (caught) {
-    const message = caught instanceof Error ? caught.message : String(caught);
-    if (caught instanceof NeedsUserInputError) {
-      await createRuntimeApprovalRequest(supabase, job.user_id, run.id, caught.approvalRequest);
-      await supabase.from("runtime_turns").update({
-        status: "needs_user_input",
-        metadata: {
-          ...runtimeTurn.metadata,
-          approvalRequest: caught.approvalRequest,
-        },
-      }).eq("id", runtimeTurn.id);
-      await supabase.from("agent_runs").update({ status: "needs_user_input", error_message: message }).eq("id", run.id);
-      await supabase.from("agent_jobs").update({ status: "needs_user_input", error_message: message }).eq("id", job.id);
+    await gateway.complete(job.id, contract.output, {
+      provider: thread.provider,
+      runtimeThreadId: thread.id,
+      title: thread.title,
+      stateVersion: state.stateVersion,
+      stateAsOf: state.asOf,
+    });
+  } catch (error) {
+    if (error instanceof NeedsUserInputError) {
+      await gateway.needsInput(job.id, error.message, error.approvalRequest);
       return;
     }
-
-    await supabase.from("runtime_turns").update({ status: "failed", metadata: { ...runtimeTurn.metadata, errorMessage: message } }).eq("id", runtimeTurn.id);
-    await supabase.from("agent_runs").update({ status: "failed", error_message: message }).eq("id", run.id);
-    await supabase.from("agent_jobs").update({ status: "failed", error_message: message }).eq("id", job.id);
+    await gateway.fail(
+      job.id,
+      error instanceof Error ? error.message : String(error),
+      true,
+    );
+  } finally {
+    clearInterval(leaseHeartbeat);
   }
 }
 
-async function persistEvent(supabase: ReturnType<typeof createWorkerSupabase>, userId: string, agentRunId: string, event: RuntimeEvent) {
-  await supabase.from("agent_events").insert({
-    user_id: userId,
-    agent_run_id: agentRunId,
-    event_type: event.type,
-    message: event.message,
-    payload: event.payload ?? {},
-    created_by: "system",
-    updated_by: "system",
+async function collectHealth(repoRoot: string) {
+  const codex = spawnSync("codex", ["login", "status"], {
+    encoding: "utf8",
+    windowsHide: true,
+    timeout: 10_000,
   });
-}
-
-async function startRuntimeThreadOrFail(
-  supabase: ReturnType<typeof createWorkerSupabase>,
-  runtime: ReturnType<typeof createRuntime>,
-  agentJobId: string,
-  agentRunId: string,
-  input: Parameters<ReturnType<typeof createRuntime>["startThread"]>[0],
-) {
-  try {
-    return await runtime.startThread(input);
-  } catch (caught) {
-    const message = caught instanceof Error ? caught.message : String(caught);
-    await supabase.from("agent_runs").update({ status: "failed", error_message: message }).eq("id", agentRunId);
-    await supabase.from("agent_jobs").update({ status: "failed", error_message: message }).eq("id", agentJobId);
-    return null;
-  }
-}
-
-async function createRuntimeApprovalRequest(
-  supabase: ReturnType<typeof createWorkerSupabase>,
-  userId: string,
-  agentRunId: string,
-  request: RuntimeApprovalRequest,
-) {
-  await supabase.from("approval_requests").insert({
-    user_id: userId,
-    agent_run_id: agentRunId,
-    title: request.title,
-    status: "pending",
-    labels: ["codex-app-server", "runtime"],
-    action_type: request.actionType,
-    rationale: request.rationale,
-    risk_level: request.riskLevel,
-    payload: {
-      description: request.description,
-      ...request.payload,
-    },
-    evidence_ids: [],
-    created_by: "agent",
-    updated_by: "agent",
+  const latex = spawnSync("latexmk", ["--version"], {
+    encoding: "utf8",
+    windowsHide: true,
+    timeout: 10_000,
   });
+  return {
+    codexAuthenticated: codex.status === 0,
+    repoAvailable: existsSync(join(repoRoot, "package.json")),
+    browserProfileAvailable: existsSync(
+      join(process.env.LOCALAPPDATA ?? "", "CareerOS", "chrome-profile"),
+    ),
+    latexAvailable: latex.status === 0,
+    codexError:
+      codex.status === 0
+        ? null
+        : (
+            codex.stderr ||
+            codex.error?.message ||
+            "Codex authentication check failed"
+          ).slice(0, 500),
+    latexError:
+      latex.status === 0
+        ? null
+        : (
+            latex.stderr ||
+            latex.error?.message ||
+            "latexmk is unavailable"
+          ).slice(0, 500),
+    platform: process.platform,
+    node: process.version,
+  };
 }
 
 function findRepoRoot(start = process.cwd()) {
   let current = resolve(start);
-
   while (true) {
-    if (existsSync(join(current, "career-os-agents", "skills")) && existsSync(join(current, "package.json"))) {
+    if (
+      existsSync(join(current, "career-os-agents", "skills")) &&
+      existsSync(join(current, "package.json"))
+    )
       return current;
-    }
-
     const parent = dirname(current);
     if (parent === current) return resolve(start);
     current = parent;
@@ -275,6 +313,8 @@ function findRepoRoot(start = process.cwd()) {
 }
 
 main().catch((error) => {
-  console.error(error);
+  log("error", "worker.fatal", {
+    message: error instanceof Error ? error.message : String(error),
+  });
   process.exitCode = 1;
 });

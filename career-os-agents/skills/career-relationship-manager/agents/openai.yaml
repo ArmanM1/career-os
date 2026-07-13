@@ -1,0 +1,4 @@
+interface:
+  display_name: "Career Relationship Manager"
+  short_description: "Manage relationships and referrals"
+  default_prompt: "Maintain contacts, interactions, warm paths, and copy-ready outreach drafts without sending."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Career Application Manager"
+  short_description: "Prepare and track applications"
+  default_prompt: "Build application packets and status workflows while stopping before final submission."

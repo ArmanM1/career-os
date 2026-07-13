@@ -1,0 +1,4 @@
+interface:
+  display_name: "Career State Curator"
+  short_description: "Maintain living career state"
+  default_prompt: "Curate the latest career-relevant state with confidence, expiry, provenance, and undo."

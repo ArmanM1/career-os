@@ -9,8 +9,7 @@ function formText(formData: FormData, key: string, fallback = "") {
 }
 
 export async function queueBrowserViabilityCheck(formData: FormData) {
-  const server = createCareerServerClient();
-  if (!server) return;
+  const server = await createCareerServerClient();
 
   const url = formText(formData, "url", "https://example.com");
   const task = formText(
@@ -21,7 +20,7 @@ export async function queueBrowserViabilityCheck(formData: FormData) {
 
   await server.supabase.from("agent_jobs").insert({
     user_id: server.userId,
-    agent_id: "career-advisor",
+    agent_id: "career-source-discovery",
     title: "Browser viability check",
     status: "queued",
     labels: ["browser-viability", "read-only"],
@@ -38,7 +37,8 @@ export async function queueBrowserViabilityCheck(formData: FormData) {
       "Include evidence entries for the page inspected and screenshot/browser artifact if available.",
     ].join("\n"),
     input: {
-      type: "browser.viability_check",
+      schemaVersion: 1,
+      type: "source.inspect",
       mode: "manual",
       url,
       task,

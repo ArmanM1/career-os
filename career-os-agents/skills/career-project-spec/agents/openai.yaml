@@ -1,0 +1,4 @@
+interface:
+  display_name: "Career Project Specification"
+  short_description: "Design role-specific projects"
+  default_prompt: "Create detailed role-specific project specifications without generating repositories or code."

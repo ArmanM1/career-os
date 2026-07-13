@@ -1,0 +1,4 @@
+interface:
+  display_name: "Career Source Discovery"
+  short_description: "Discover durable career sources"
+  default_prompt: "Find and evaluate durable public and authenticated sources without taking external actions."

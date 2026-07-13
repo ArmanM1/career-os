@@ -222,7 +222,7 @@ export const opportunityRecommendationSchema = careerObjectEnvelopeSchema.extend
     deadlineSummary: z.string().optional(),
     sourceSummary: z.string(),
   }),
-  scoreBreakdown: z.record(z.number()).default({}),
+  scoreBreakdown: z.record(z.string(), z.number()).default({}),
   projectBridgeAssessment: z
     .object({
       bridgeable: z.boolean(),
@@ -355,8 +355,8 @@ export const signalSchema = careerObjectEnvelopeSchema.extend({
   opportunityType: z.enum(["job", "internship", "event", "program", "fellowship", "competition", "other"]).optional(),
   postedAt: z.string().datetime().optional(),
   deadlineAt: z.string().datetime().optional(),
-  rawPayload: z.record(z.unknown()).default({}),
-  normalizedPayload: z.record(z.unknown()).default({}),
+  rawPayload: z.record(z.string(), z.unknown()).default({}),
+  normalizedPayload: z.record(z.string(), z.unknown()).default({}),
   parserName: z.string().optional(),
   parserConfidence: confidenceSchema.optional(),
   rationale: z.string().default(""),
@@ -387,7 +387,7 @@ export const sourceMonitorSchema = careerObjectEnvelopeSchema.extend({
   lastSeenCursor: z.string().optional(),
   lastSeenHash: z.string().optional(),
   sourceRationale: z.string().default(""),
-  evaluation: z.record(z.unknown()).default({}),
+  evaluation: z.record(z.string(), z.unknown()).default({}),
   relatedCompanyIds: z.array(z.string().uuid()).default([]),
 });
 
@@ -415,18 +415,22 @@ export const connectedAccountSchema = careerObjectEnvelopeSchema.extend({
 
 export const proposedMutationSchema = z.object({
   id: z.string().uuid(),
+  idempotencyKey: z.string().min(1).max(240).optional(),
   mutationType: z.string(),
   targetObjectType: objectTypeSchema,
   targetObjectId: z.string().uuid().optional(),
-  payload: z.record(z.unknown()),
+  payload: z.record(z.string(), z.unknown()),
   rationale: z.string(),
   evidenceIds: z.array(z.string().uuid()).default([]),
   confidence: confidenceSchema,
   approvalPolicy: approvalPolicySchema,
+  expectedObjectVersion: z.number().int().positive().optional(),
 });
 
 export const agentOutputSchema = z.object({
+  schemaVersion: z.literal(1).default(1),
   summary: z.string(),
+  messageParts: z.array(z.object({ type: z.enum(["text", "source", "tool", "approval", "warning", "affected_object", "suggestion", "attachment"]), payload: z.record(z.string(), z.unknown()).default({}) })).default([]),
   proposedMutations: z.array(proposedMutationSchema).default([]),
   approvalRequests: z.array(
     z.object({
@@ -437,7 +441,7 @@ export const agentOutputSchema = z.object({
       targetObjectId: z.string().uuid().optional(),
       rationale: z.string(),
       riskLevel: z.enum(["low", "medium", "high"]),
-      payload: z.record(z.unknown()).default({}),
+      payload: z.record(z.string(), z.unknown()).default({}),
       evidenceIds: z.array(z.string().uuid()).default([]),
     }),
   ).default([]),
@@ -448,10 +452,11 @@ export const agentOutputSchema = z.object({
       id: z.string().uuid().optional(),
       sourceUrl: z.string().optional(),
       excerpt: z.string().optional(),
-      payload: z.record(z.unknown()).default({}),
+      payload: z.record(z.string(), z.unknown()).default({}),
     }),
   ).default([]),
-  followUpQuestions: z.array(z.string()).default([]),
+  stateObservations: z.array(z.object({ itemType: z.string(), stableKey: z.string(), value: z.unknown(), humanValue: z.string(), confidence: confidenceSchema, salience: z.number().int().min(0).max(100), expiresAt: z.string().datetime().optional(), userStated: z.boolean().default(false), rationale: z.string() })).default([]),
+  followUpQuestions: z.array(z.union([z.string(), z.object({ question: z.string(), reason: z.string().default(""), affectedFields: z.array(z.string()).default([]) })])).default([]),
   warnings: z.array(z.string()).default([]),
 });
 

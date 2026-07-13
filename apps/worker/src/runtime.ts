@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { isAbsolute, relative, resolve } from "node:path";
-import { AgentOutput } from "@career-os/core";
+import { AgentOutput, agentSchemas, getAgentContract, normalizeAgentId } from "@career-os/core";
+import { z } from "zod";
 import { AppServerMessage, CodexAppServerClient } from "./codex-app-server-client";
 
 type JsonObject = Record<string, unknown>;
@@ -37,6 +38,7 @@ export type StartThreadInput = {
 };
 
 export type RunTurnInput = {
+  agentId: string;
   thread: RuntimeThread;
   prompt: string;
   skillPath: string;
@@ -75,8 +77,11 @@ export class MockRuntime implements AgentRuntime {
       type: "completed",
       message: "Mock runtime completed with no mutations.",
       payload: {
+        schemaVersion: 1,
         summary: "Mock runtime completed.",
+        messageParts: [],
         proposedMutations: [],
+        stateObservations: [],
         approvalRequests: [],
         evidence: [],
         followUpQuestions: [],
@@ -108,6 +113,7 @@ export class CodexAppServerRuntime implements AgentRuntime {
       sandbox: "workspace-write",
       config: {
         web_search: "live",
+        ...careerOsMcpConfig(input.cwd, input.agentId),
       },
       serviceName: "career-os-worker",
       baseInstructions: careerOsBaseInstructions,
@@ -139,6 +145,7 @@ export class CodexAppServerRuntime implements AgentRuntime {
         sandbox: "workspace-write",
         config: {
           web_search: "live",
+          ...careerOsMcpConfig(cwd),
         },
         baseInstructions: careerOsBaseInstructions,
         persistExtendedHistory: true,
@@ -227,7 +234,7 @@ export class CodexAppServerRuntime implements AgentRuntime {
           model: codexModel(),
           approvalPolicy: "on-request",
           approvalsReviewer: "user",
-          outputSchema: agentOutputJsonSchema,
+          outputSchema: outputSchemaForAgent(input.agentId),
         },
         turnTimeoutMs(input.context),
       );
@@ -258,7 +265,11 @@ export class CodexAppServerRuntime implements AgentRuntime {
 
   async archiveThread(threadId: string): Promise<void> {
     const client = await this.clientFor(this.cwd ?? process.cwd());
-    await client.request("thread/archive", { threadId });
+    try {
+      await client.request("thread/archive", { threadId });
+    } catch (error) {
+      if (!(error instanceof Error) || !/no rollout found/i.test(error.message)) throw error;
+    }
   }
 
   dispose() {
@@ -290,7 +301,7 @@ export class CodexAppServerRuntime implements AgentRuntime {
     if (id === undefined) return {};
 
     if (method === "item/commandExecution/requestApproval") {
-      if (isSafeCommandRequest(params, input.thread.cwd)) {
+      if (isSafeCommandRequest(params, input)) {
         client.respond(id, { decision: "accept" });
         return {
           event: {
@@ -306,7 +317,7 @@ export class CodexAppServerRuntime implements AgentRuntime {
     }
 
     if (method === "item/fileChange/requestApproval") {
-      if (isSafeFileChangeRequest(params, input.thread.cwd)) {
+      if (isSafeFileChangeRequest(params, input)) {
         client.respond(id, { decision: "accept" });
         return {
           event: {
@@ -339,7 +350,7 @@ export class CodexAppServerRuntime implements AgentRuntime {
     }
 
     if (method === "execCommandApproval") {
-      if (isSafeCommandRequest(params, input.thread.cwd)) {
+      if (isSafeCommandRequest(params, input)) {
         client.respond(id, { decision: "approved" });
         return { event: { type: "tool", message: "Approved legacy command request.", payload: { method, params } } };
       }
@@ -349,7 +360,7 @@ export class CodexAppServerRuntime implements AgentRuntime {
     }
 
     if (method === "applyPatchApproval") {
-      if (isSafeApplyPatchRequest(params, input.thread.cwd)) {
+      if (isSafeApplyPatchRequest(params, input)) {
         client.respond(id, { decision: "approved" });
         return { event: { type: "tool", message: "Approved workspace patch request.", payload: { method, params } } };
       }
@@ -702,8 +713,8 @@ function buildTurnPrompt(input: RunTurnInput) {
     "Return exactly one JSON object matching the supplied output schema. Do not wrap it in markdown fences.",
     "Every proposed mutation id must be a UUID.",
     "Use canonical snake_case object types such as 'source_monitor', not UI names like 'SourceMonitor'.",
-    "For source monitor proposals, use mutationType 'source_monitor.create_proposal'.",
-    "Use fetchStrategy values only from: http, git_pull, browser, manual, api.",
+    "Use only mutation types registered for the selected agent contract.",
+    "Every auto-applied mutation must include a deterministic idempotencyKey; updates must include expectedObjectVersion.",
     "Use approvalPolicy 'auto_apply' only for safe internal Career OS database proposals. Use 'approval_required' for external or irreversible actions.",
     "If you cannot complete the task, return a valid JSON object with warnings and followUpQuestions.",
     `User/task prompt:\n${input.prompt || "(no prompt supplied)"}`,
@@ -716,8 +727,43 @@ function turnTimeoutMs(context: JsonObject) {
   return Math.max(5, Math.min(minutes, 90)) * 60_000;
 }
 
+function outputSchemaForAgent(agentId: string) {
+  const normalized = normalizeAgentId(agentId);
+  return normalized ? z.toJSONSchema(agentSchemas[normalized].output) : agentOutputJsonSchema;
+}
+
 function codexModel() {
-  return process.env.CAREER_OS_CODEX_MODEL ?? "gpt-5.4";
+  return process.env.CAREER_OS_CODEX_MODEL || undefined;
+}
+
+function careerOsMcpConfig(cwd: string, agentId?: string) {
+  const gatewayUrl = process.env.CAREER_OS_GATEWAY_URL ?? "http://localhost:3000";
+  const dataDir = process.env.CAREER_OS_DATA_DIR ?? process.env.LOCALAPPDATA;
+  if (!dataDir) throw new Error("CAREER_OS_DATA_DIR or LOCALAPPDATA is required to launch the Career OS MCP server.");
+  const mcpServers: JsonObject = {
+      career_os: {
+        command: process.execPath,
+        args: [resolve(cwd, "node_modules/tsx/dist/cli.mjs"), resolve(cwd, "apps/worker/src/mcp-server.ts")],
+        env: {
+          CAREER_OS_GATEWAY_URL: gatewayUrl,
+          CAREER_OS_DATA_DIR: dataDir,
+        },
+        startup_timeout_sec: 20,
+        tool_timeout_sec: 30,
+      },
+  };
+  const contract = agentId ? getAgentContract(agentId) : null;
+  if (contract?.allowedCapabilities.includes("browser_read")) {
+    const profile = resolve(dataDir, "CareerOS", "chrome-profile");
+    const output = resolve(dataDir, "CareerOS", "workspace", "evidence", "browser");
+    mcpServers.playwright = {
+      command: process.execPath,
+      args: [resolve(cwd, "node_modules/@playwright/mcp/cli.js"), "--browser", "chrome", "--user-data-dir", profile, "--output-dir", output, "--block-service-workers", "--codegen", "none", "--init-script", resolve(cwd, "apps/worker/src/browser-final-submit-guard.js")],
+      startup_timeout_sec: 30,
+      tool_timeout_sec: 60,
+    };
+  }
+  return { mcp_servers: mcpServers };
 }
 
 function parseAgentOutput(text: string): JsonObject {
@@ -905,41 +951,39 @@ function messageBelongsToThread(message: AppServerMessage, threadId: string, tur
   return true;
 }
 
-function isSafeCommandRequest(params: JsonObject, cwd: string) {
+function isSafeCommandRequest(params: JsonObject, input: RunTurnInput) {
   const command = getString(params, "command") ?? getString(params, "cmd") ?? "";
-  const requestCwd = getString(params, "cwd") ?? cwd;
-  if (!isSafePath(requestCwd, cwd)) return false;
-  if (!command) return true;
-
-  const denied = [
-    /\bgit\s+push\b/i,
-    /\bgh\s+pr\s+create\b/i,
-    /\brm\s+-rf\b/i,
-    /\bRemove-Item\b[\s\S]*\b-Recurse\b/i,
-    /\b(del|erase|rmdir|rd)\b/i,
-    /\bformat\b/i,
-    /\bshutdown\b/i,
-    /\breg\s+(add|delete)\b/i,
-    /\bSet-ExecutionPolicy\b/i,
-    /\bcurl\b[\s\S]*(?:-X|--request)\s*POST\b/i,
-    /\bInvoke-WebRequest\b[\s\S]*-Method\s+Post\b/i,
-  ];
-
-  return !denied.some((pattern) => pattern.test(command));
+  const requestCwd = getString(params, "cwd") ?? input.thread.cwd;
+  if (!isSafePath(requestCwd, input.thread.cwd) || !command) return false;
+  const capabilities = new Set(stringList(input.context.requiredCapabilities));
+  const first = command.trim().match(/^(?:&\s*)?(?:["']?[^"'\s\\/]+["']?[\\/])?([a-zA-Z][\w.-]*)/)?.[1]?.toLowerCase();
+  if (!first) return false;
+  if (capabilities.has("read_files") && new Set(["rg", "get-content", "get-childitem", "resolve-path", "test-path"]).has(first)) return true;
+  if (capabilities.has("latex_compile") && new Set(["latexmk", "pdflatex", "xelatex", "lualatex", "biber"]).has(first)) return true;
+  return false;
 }
 
-function isSafeFileChangeRequest(params: JsonObject, cwd: string) {
+function isSafeFileChangeRequest(params: JsonObject, input: RunTurnInput) {
+  if (!stringList(input.context.requiredCapabilities).includes("write_workspace")) return false;
   const grantRoot = getString(params, "grantRoot");
-  return !grantRoot || isSafePath(grantRoot, cwd);
+  return Boolean(grantRoot && isSafeWritablePath(grantRoot, input.thread.cwd));
 }
 
-function isSafeApplyPatchRequest(params: JsonObject, cwd: string) {
-  const requestCwd = getString(params, "cwd") ?? cwd;
-  return isSafePath(requestCwd, cwd);
+function isSafeApplyPatchRequest(params: JsonObject, input: RunTurnInput) {
+  if (!stringList(input.context.requiredCapabilities).includes("write_workspace")) return false;
+  const requestCwd = getString(params, "cwd") ?? input.thread.cwd;
+  return isSafeWritablePath(requestCwd, input.thread.cwd);
+}
+
+function isSafeWritablePath(candidate: string, cwd: string) {
+  const absolute = isAbsolute(candidate) ? resolve(candidate) : resolve(cwd, candidate);
+  const localRoot = resolve(process.env.LOCALAPPDATA ?? tmpdir(), "CareerOS", "workspace");
+  return isInside(localRoot, absolute) || isInside(resolve(cwd, "career-os-workspace"), absolute) || isInside(tmpdir(), absolute);
 }
 
 function isSafeMcpElicitation(params: JsonObject, input: RunTurnInput) {
-  const allowInteractive = Boolean(input.context.browserUseAllowed || input.context.computerUseAllowed);
+  const capabilities = stringList(input.context.requiredCapabilities);
+  const allowInteractive = capabilities.includes("browser_read") || capabilities.includes("browser_fill_after_approval");
   if (!allowInteractive) return false;
 
   const serverName = getString(params, "serverName")?.toLowerCase();
@@ -958,12 +1002,21 @@ function isSafeMcpElicitation(params: JsonObject, input: RunTurnInput) {
     "browser_wait",
     "browser_console_messages",
     "browser_network_requests",
+    "browser_click",
+    "browser_type",
+    "browser_fill_form",
   ]);
   if (!readOnlyTools.has(toolName)) return false;
 
   const toolParams = mcpToolParams(params);
   const url = getString(toolParams, "url");
   if (url && !isSafeBrowserUrl(url)) return false;
+  if (["browser_click", "browser_type", "browser_fill_form"].includes(toolName)) {
+    const description = JSON.stringify(toolParams ?? {}).toLowerCase();
+    if (!description || (toolName === "browser_click" && /\b(send|submit|apply|follow|like|comment|post|purchase|checkout|register|confirm)\b/.test(description))) return false;
+    if (!capabilities.includes("browser_fill_after_approval") && /\b(password|message|dm|comment|post)\b/.test(description)) return false;
+    if (/\bpassword\b/.test(description)) return false;
+  }
 
   return true;
 }
@@ -995,7 +1048,8 @@ function buildPermissionGrant(params: JsonObject, input: RunTurnInput) {
   const permissions = params.permissions as JsonObject | undefined;
   if (!permissions || typeof permissions !== "object") return null;
 
-  const allowInteractive = Boolean(input.context.browserUseAllowed || input.context.computerUseAllowed);
+  const capabilities = stringList(input.context.requiredCapabilities);
+  const allowInteractive = capabilities.includes("browser_read") || capabilities.includes("browser_fill_after_approval");
   const network = permissions.network as JsonObject | null | undefined;
   const fileSystem = permissions.fileSystem as JsonObject | null | undefined;
   const granted: JsonObject = {};

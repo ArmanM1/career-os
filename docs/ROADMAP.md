@@ -1,141 +1,32 @@
-# Roadmap
+# Production implementation status
 
-## Phase 0: Architecture and Schema
+This document tracks the accepted first-user production build. It is not a speculative candidate roadmap.
 
-Deliverables:
+## Implemented locally
 
-- Architecture v1.
-- Candidate object catalog.
-- Agent and routing design.
-- Source monitor design.
-- Resume library design.
-- Initial database schema draft.
-- Initial mutation schema draft.
-- Supabase project connection plan.
+- Recoverable Git baseline and verified DPAPI-encrypted production database snapshot outside the repository.
+- Node 24.13.1, Next.js 16.2.10, React 19.2.7, TypeScript 5.9, Tailwind v4, shadcn/ui, selected AI Elements, Vitest, and Playwright foundations.
+- Supabase v2 domains, private buckets, RLS, grants, indexes, Realtime scope, atomic job/source claims, leases/retries, pairing, approvals, mutation application, state versioning, onboarding, OAuth state, and completion RPCs.
+- Password auth, no public signup, authenticated layouts/actions/routes, no fixed user IDs, no browser service role, and no demo fallback.
+- Paired Windows worker, DPAPI secret, gateway-only access, heartbeat, scheduler, queue recovery, deterministic source adapters, and Task Scheduler installer.
+- Thirteen versioned agent contracts and skills, complete mutation registry, per-agent output schema, persistent runtime threads, and local Career OS MCP read/proposal tools.
+- Living state extraction pipeline, fresh context assembly, visible state/history/expiry, evidence rationale, and transactional undo.
+- Responsive dashboard, threads, opportunities, relationships, events, check-ins, approvals, activity, settings, worker setup, and resumable onboarding surfaces.
+- Read-only Google Gmail/Calendar and GitHub OAuth/sync foundations with encrypted server-side tokens.
+- Resend idempotent outbox delivery, signed webhook updates, and daily retention/state-expiry maintenance cron.
+- CI definitions for typecheck, lint, unit, audit, build, local migrations/RLS, and desktop/mobile Playwright checks.
 
-Exit criteria:
+## Remaining before production acceptance
 
-- User approves/declines candidate objects.
-- V1 object list is locked.
-- V1 workflow list is locked.
+1. Complete artifact upload/sync and production-grade resume extraction, verified experience review, `latexmk` compilation, diff, and mobile PDF workflow.
+2. Complete dedicated Chrome-profile workflows for Instagram stories, Handshake, LinkedIn targeted contact lookup, portal status checks, and approved form preparation using saved CI fixtures.
+3. Finish connector cursors, scheduled connector dispatch, manual resync/health UI, and production OAuth configuration.
+4. Finish source health sections, source discovery UI, authenticated-source enablement, and adapter repair/review workflow.
+5. Finish application packet/status UI and execute the complete opportunity → resume → project spec → referral → approved form-fill → manual submit path.
+6. Finish relationship/contact imports, interaction stages, event attendance/notes, and opportunity-triggered relationship reprioritization.
+7. Add thread rename/search/attachments/stop/retry/branch/context inspector and richer message-part rendering.
+8. Add notification preference/producer logic, export/deletion flows, system-health metrics, backup/restore automation, and runbooks.
+9. Expand database/runtime/source/browser/golden-path tests to the full acceptance matrix.
+10. Provision staging Vercel/Supabase/OAuth/Resend, apply migrations to staging, run the golden path, then migrate production using the verified backup and archive strategy.
 
-## Phase 1: Core App Skeleton
-
-Deliverables:
-
-- Next.js app.
-- Supabase project integration.
-- Auth.
-- Database migrations.
-- Main dashboard.
-- Application pipeline.
-- Goal/timeline view.
-- Resume library page.
-- Approval inbox.
-- Connected accounts status page.
-
-Exit criteria:
-
-- User can log in from desktop and phone.
-- UI renders real database objects.
-- Manual CRUD works for core objects.
-
-## Phase 2: Local Worker and Codex Runtime
-
-Deliverables:
-
-- Local worker process.
-- Supabase job queue integration.
-- Codex App Server runtime adapter.
-- Thread and turn persistence.
-- Structured output validation.
-- Agent event logging.
-- Approval request flow.
-
-Exit criteria:
-
-- UI can enqueue an agent job.
-- Local worker runs Codex.
-- Agent returns structured mutations.
-- Safe mutations apply to database.
-- Approval-required actions appear in UI.
-
-## Phase 3: Onboarding and Job Search
-
-Deliverables:
-
-- Onboarding agent skill.
-- Job Finder agent skill.
-- Dynamic onboarding UI.
-- Resume import.
-- GitHub/source setup prompts.
-- Calendar/email connection prompts.
-- Academic context setup.
-- Initial source monitor proposals.
-- Initial application status check policies.
-- Initial goal hierarchy.
-- Initial application strategy.
-
-Exit criteria:
-
-- Onboarding creates usable profile, goals, tasks, and source proposals.
-- Job search is part of onboarding.
-
-## Phase 4: Source Monitors
-
-Deliverables:
-
-- SourceMonitor tables.
-- SourceRun tables.
-- ApplicationStatusCheck tables.
-- GitHub repo monitor support.
-- Company board monitor support.
-- Event source monitor support.
-- Email/calendar status signal support.
-- Source Adapter Builder agent.
-
-Exit criteria:
-
-- A GitHub repo can be cloned/pulled on schedule.
-- Parser emits opportunities.
-- New opportunities update dashboard or approval inbox.
-
-## Phase 5: Resume Library
-
-Deliverables:
-
-- LaTeX resume folder structure.
-- Resume metadata schema.
-- Resume Tailor agent.
-- PDF compile pipeline.
-- Diff and rationale view.
-
-Exit criteria:
-
-- User can generate, inspect, approve, and use a role-specific resume variant.
-
-## Phase 6: Weekly Briefing
-
-Deliverables:
-
-- Weekly Planner agent.
-- Weekly briefing UI tabs.
-- Check-in form.
-- Task reprioritization.
-- Application/event/mentor summary.
-
-Exit criteria:
-
-- Weekly briefing updates dashboard based on real state.
-
-## Phase 7: Mentors, Events, and Activity
-
-Deliverables:
-
-- Mentor Manager agent.
-- Event Scanner agent.
-- GitHub activity signals.
-
-Exit criteria:
-
-- System can connect applications, events, contacts, and goals into concrete tasks.
+No production database migration or external deployment occurs until the local and staging gates pass. Legacy production data remains preserved until explicit deletion approval.

@@ -1,0 +1,7 @@
+import { Activity } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { requireUser } from "@/lib/supabase/server";
+
+export const dynamic = "force-dynamic";
+export default async function ActivityPage() { const { supabase, user } = await requireUser(); const { data } = await supabase.from("audit_log_entries").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(200); return <div className="mx-auto max-w-5xl space-y-6"><header><h1 className="text-3xl font-semibold">Activity & audit</h1><p className="mt-2 text-sm text-muted-foreground">Every meaningful user, agent, and system change with provenance and rationale.</p></header><Card><CardHeader><CardTitle>Recent activity</CardTitle></CardHeader><CardContent className="divide-y">{data?.map((entry) => <div key={entry.id} className="flex gap-3 py-4"><Activity className="mt-1 size-4 shrink-0 text-muted-foreground" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{entry.summary || entry.action_type}</p><Badge variant="outline">{entry.action_type}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{new Date(entry.created_at).toLocaleString()} · {entry.created_by}</p></div></div>)}{data?.length === 0 ? <p className="py-12 text-center text-muted-foreground">No audited changes yet.</p> : null}</CardContent></Card></div>; }

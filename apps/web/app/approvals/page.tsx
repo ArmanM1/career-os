@@ -1,33 +1,9 @@
-import { PageHeader } from "@/components/page-header";
-import { ObjectCard } from "@/components/object-card";
-import { Panel } from "@/components/panel";
-import { getDashboardData } from "@/lib/data";
+import { Check, ShieldAlert, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { requireUser } from "@/lib/supabase/server";
+import { decideApproval } from "./actions";
 
 export const dynamic = "force-dynamic";
-
-type ApprovalRow = { id: string; title: string; status?: string; labels?: string[]; rationale?: string };
-
-export default async function ApprovalsPage() {
-  const { approvals } = await getDashboardData();
-  const rows = approvals as ApprovalRow[];
-
-  return (
-    <>
-      <PageHeader
-        title="Approvals"
-        description="Externally visible or irreversible actions wait here: sending, submitting, connector scope expansion, authenticated browser control, and deletion."
-      />
-      <Panel title="Pending Approval Requests" count={rows.length}>
-        <div className="item-list">
-          {rows.map((approval) => (
-            <ObjectCard
-              key={approval.id}
-              item={approval}
-              footer={<div className="item-meta">{approval.rationale ? <span>{approval.rationale}</span> : null}</div>}
-            />
-          ))}
-        </div>
-      </Panel>
-    </>
-  );
-}
+export default async function ApprovalsPage() { const { supabase, user } = await requireUser(); const { data: approvals, error } = await supabase.from("approval_requests").select("*").eq("user_id", user.id).eq("status", "pending").order("created_at"); if (error) throw new Error(error.message); return <div className="mx-auto max-w-4xl space-y-6"><header><h1 className="text-3xl font-semibold">Approvals</h1><p className="mt-2 text-sm text-muted-foreground">Exact payloads for external actions, permission expansion, sensitive exports, and deletion. Career OS never exposes send or final-submit actions.</p></header><div className="space-y-4">{approvals?.map((approval) => <Card key={approval.id}><CardHeader><div className="flex items-start justify-between gap-4"><div><CardTitle className="flex items-center gap-2"><ShieldAlert className="size-5" />{approval.title}</CardTitle><CardDescription className="mt-2">{approval.rationale}</CardDescription></div><Badge variant={approval.risk_level === "high" ? "destructive" : "outline"}>{approval.risk_level} risk</Badge></div></CardHeader><CardContent className="space-y-4"><div className="grid gap-3 rounded-lg border bg-muted/20 p-4 text-sm sm:grid-cols-2"><div><p className="text-xs text-muted-foreground">Action</p><p className="font-medium">{approval.action_type}</p></div><div><p className="text-xs text-muted-foreground">Target</p><p className="font-mono text-xs">{approval.target_object_type ?? "—"} {approval.target_object_id ?? ""}</p></div></div><details><summary className="cursor-pointer text-sm font-medium">Review exact payload</summary><pre className="mt-2 max-h-80 overflow-auto rounded-lg bg-muted p-3 text-xs">{JSON.stringify(approval.payload, null, 2)}</pre></details><div className="flex gap-2"><form action={decideApproval.bind(null, approval.id, "approved")}><Button><Check />Approve</Button></form><form action={decideApproval.bind(null, approval.id, "rejected")}><Button variant="destructive"><X />Reject</Button></form></div></CardContent></Card>)}{approvals?.length === 0 ? <Card><CardContent className="py-16 text-center"><Check className="mx-auto size-8 text-status-success" /><p className="mt-3 font-medium">Nothing needs approval</p><p className="text-sm text-muted-foreground">Safe internal updates continue automatically.</p></CardContent></Card> : null}</div></div>; }
