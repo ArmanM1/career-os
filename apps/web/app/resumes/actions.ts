@@ -43,3 +43,38 @@ export async function uploadResumeSource(formData: FormData) {
   revalidatePath("/resumes");
   revalidatePath("/onboarding");
 }
+
+export async function saveExperience(experienceId: string | null, formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const title = String(formData.get("title") ?? "").trim();
+  const organization = String(formData.get("organization") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const startsAt = String(formData.get("startsAt") ?? "").trim();
+  const endsAt = String(formData.get("endsAt") ?? "").trim();
+  if (!title) throw new Error("Experience title is required.");
+  const values = { title, organization: organization || null, description: description || null, starts_at: startsAt || null, ends_at: endsAt || null, status: "draft", updated_by: "user" as const };
+  const result = experienceId
+    ? await supabase.from("experiences").update(values).eq("id", experienceId).eq("user_id", user.id).select("id").maybeSingle()
+    : await supabase.from("experiences").insert({ ...values, user_id: user.id, created_by: "user" }).select("id").single();
+  if (result.error || !result.data) throw new Error("Unable to save this experience.");
+  revalidatePath("/resumes");
+}
+
+export async function setExperienceReview(experienceId: string, status: "verified" | "draft") {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase.from("experiences").update({ status, updated_by: "user" }).eq("id", experienceId).eq("user_id", user.id).select("id").maybeSingle();
+  if (error || !data) throw new Error("Unable to update the experience review state.");
+  revalidatePath("/resumes");
+  revalidatePath("/onboarding");
+}
+
+export async function addExperienceAchievement(experienceId: string, formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const achievement = String(formData.get("achievement") ?? "").trim();
+  if (!achievement) throw new Error("Achievement text is required.");
+  const { data: experience } = await supabase.from("experiences").select("id").eq("id", experienceId).eq("user_id", user.id).maybeSingle();
+  if (!experience) throw new Error("Experience not found.");
+  const { error } = await supabase.from("experience_achievements").insert({ user_id: user.id, experience_id: experienceId, title: achievement.slice(0, 120), achievement, status: "verified", provenance: "user", created_by: "user", updated_by: "user" });
+  if (error) throw new Error("Unable to add this achievement.");
+  revalidatePath("/resumes");
+}

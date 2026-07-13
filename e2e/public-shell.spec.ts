@@ -35,6 +35,15 @@ test("an invited user can sign in and reach the responsive product shell", async
     await expect(page).toHaveURL(/\/dashboard/);
     await expect(page.getByRole("heading", { name: /good morning/i })).toBeVisible();
     await expect(page.getByRole("link", { name: /opportunities/i }).first()).toBeVisible();
+    await page.goto("/resumes");
+    await expect(page.getByRole("heading", { name: "Verified experience library" })).toBeVisible();
+    await page.getByPlaceholder("Role or experience title").fill("Software Engineering Intern");
+    await page.getByPlaceholder("Organization").fill("Example Labs");
+    await page.getByPlaceholder("Verified scope, responsibilities, and context").fill("Built and tested an internal workflow used by the engineering team.");
+    await page.getByRole("button", { name: "Add experience" }).click();
+    await expect(page.locator('input[name="title"]').nth(1)).toHaveValue("Software Engineering Intern");
+    await page.getByRole("button", { name: "Mark facts verified" }).click();
+    await expect(page.getByText("verified", { exact: true })).toBeVisible();
   } finally {
     await request.delete(`${localSupabaseUrl}/auth/v1/admin/users/${user.id}`, { headers: { apikey: localServiceRoleKey, authorization: `Bearer ${localServiceRoleKey}` } });
   }

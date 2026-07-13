@@ -15,13 +15,14 @@ This document tracks the accepted first-user production build. It is not a specu
 - Read-only Google Gmail/Calendar and GitHub OAuth/sync foundations with encrypted server-side tokens.
 - Resend idempotent outbox delivery, signed webhook updates, and daily retention/state-expiry maintenance cron.
 - Private artifact upload/download URLs, checksum-verified local synchronization, and workspace-confined agent artifact uploads.
+- Web-based experience library review with factual corrections, user-verified achievements, and explicit draft/verified state.
 - Scheduled connector dispatch with downstream review jobs, source-signal opportunity jobs, operational notification producers, and user notification/timezone controls.
 - Registry-owned approval enforcement at the worker completion boundary, including review-only ambiguous application status changes and transactional approval creation.
 - CI definitions for typecheck, lint, unit, audit, build, local migrations/RLS, and desktop/mobile Playwright checks.
 
 ## Remaining before production acceptance
 
-1. Complete production-grade resume extraction, verified experience review, `latexmk` compilation, diff, and mobile PDF workflow.
+1. Complete production-grade resume extraction, `latexmk` compilation, generated diffs, and the mobile PDF workflow.
 2. Complete dedicated Chrome-profile workflows for Instagram stories, Handshake, LinkedIn targeted contact lookup, portal status checks, and approved form preparation using saved CI fixtures.
 3. Finish connector cursors, manual resync/health UI, and production OAuth configuration.
 4. Finish source health sections, source discovery UI, authenticated-source enablement, and adapter repair/review workflow.
