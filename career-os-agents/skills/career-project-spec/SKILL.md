@@ -16,6 +16,10 @@ Produce a specification containing:
 - estimated build time and explicit scope cuts;
 - resume bullet angle and interview talking points.
 
+When `applicationId` is provided, link the ready specification to both the
+application and opportunity so the Application Manager can place it in the
+packet. Do not describe the proposed project as completed experience.
+
 Make the project distinctive, demonstrable, and feasible before the deadline. Distinguish skills the user already has from skills the project would develop. Create only the specification and related planning task.
 
 Never create a repository, write the project code, deploy it, or claim unbuilt results as experience.

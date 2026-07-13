@@ -101,12 +101,25 @@ async function callTool(userId: string, agentId: string, tool: z.infer<typeof to
 
   if (tool === "career.resumes.read") {
     const limit = listSchema.parse(input).limit;
-    const [{ data: versions, error: versionsError }, { data: variants, error: variantsError }] = await Promise.all([
+    const [
+      { data: versions, error: versionsError },
+      { data: variants, error: variantsError },
+      { data: experiences, error: experiencesError },
+      { data: achievements, error: achievementsError },
+      { data: projects, error: projectsError },
+      { data: skills, error: skillsError },
+      { data: templates, error: templatesError },
+    ] = await Promise.all([
       admin.from("resume_versions").select("*").eq("user_id", userId).is("archived_at", null).order("updated_at", { ascending: false }).limit(limit),
       admin.from("resume_variants").select("*").eq("user_id", userId).is("archived_at", null).order("updated_at", { ascending: false }).limit(limit),
+      admin.from("experiences").select("*").eq("user_id", userId).is("archived_at", null).order("updated_at", { ascending: false }).limit(limit),
+      admin.from("experience_achievements").select("*").eq("user_id", userId).is("archived_at", null).order("updated_at", { ascending: false }).limit(limit * 4),
+      admin.from("projects").select("*").eq("user_id", userId).is("archived_at", null).order("updated_at", { ascending: false }).limit(limit),
+      admin.from("skills").select("*").eq("user_id", userId).is("archived_at", null).order("updated_at", { ascending: false }).limit(limit * 4),
+      admin.from("resume_templates").select("*").eq("user_id", userId).is("archived_at", null).order("updated_at", { ascending: false }).limit(limit),
     ]);
-    if (versionsError || variantsError) throw new Error("Unable to read resumes");
-    return { versions: versions ?? [], variants: variants ?? [] };
+    if (versionsError || variantsError || experiencesError || achievementsError || projectsError || skillsError || templatesError) throw new Error("Unable to read resume component library");
+    return { versions: versions ?? [], variants: variants ?? [], experiences: experiences ?? [], achievements: achievements ?? [], projects: projects ?? [], skills: skills ?? [], templates: templates ?? [] };
   }
 
   if (tool === "career.evidence.read") {

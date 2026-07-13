@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(30);
+select plan(34);
 
 select is((select count(*)::integer from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r' and not c.relrowsecurity), 0, 'RLS enabled on every public table');
 select is((select count(*)::integer from storage.buckets where id in ('resume-sources','resume-artifacts','thread-attachments','evidence','exports') and public=false), 5, 'all storage buckets are private');
@@ -128,6 +128,19 @@ values ('00000000-0000-4000-8000-000000000712','00000000-0000-4000-8000-00000000
 select lives_ok($$select public.apply_career_mutation('00000000-0000-4000-8000-000000000712')$$, 'resume experience component mutation applies');
 select is((select status from public.experiences where title='Software Engineering Intern'), 'draft', 'extracted experience requires user verification');
 select is((select metadata->'sourceArtifactIds'->>0 from public.experiences where title='Software Engineering Intern'), '00000000-0000-4000-8000-000000000711', 'extracted component keeps source artifact provenance');
+
+insert into public.opportunities(id,user_id,title,opportunity_type,status,url,created_by,updated_by)
+values ('00000000-0000-4000-8000-000000000801','00000000-0000-4000-8000-000000000101','Platform Engineering Intern','internship','open','https://example.com/jobs/platform','system','system');
+insert into public.applications(id,user_id,title,status,opportunity_id,created_by,updated_by)
+values ('00000000-0000-4000-8000-000000000802','00000000-0000-4000-8000-000000000101','Example — Platform Engineering Intern','drafting','00000000-0000-4000-8000-000000000801','user','user');
+insert into public.proposed_mutations(id,user_id,mutation_type,target_object_type,target_object_id,payload,rationale,confidence,approval_policy,status,idempotency_key)
+values ('00000000-0000-4000-8000-000000000803','00000000-0000-4000-8000-000000000101','application.upsert','application','00000000-0000-4000-8000-000000000802','{"title":"Example — Platform Engineering Intern","status":"drafting","opportunityId":"00000000-0000-4000-8000-000000000801","nextAction":"Review the generated packet."}','Application packet refresh','high','auto_apply','pending','test-application-workflow');
+select lives_ok($$select public.apply_career_mutation('00000000-0000-4000-8000-000000000803')$$, 'application workflow mutation applies through the trusted dispatcher');
+select is((select next_action from public.applications where id='00000000-0000-4000-8000-000000000802'), 'Review the generated packet.', 'application workflow persists one explicit next action');
+select is((select count(*)::integer from public.audit_log_entries where target_object_id='00000000-0000-4000-8000-000000000802' and action_type='mutation.applied'), 1, 'application workflow mutation is audited transactionally');
+insert into public.resume_variants(id,user_id,title,status,application_id,latex_path,created_by,updated_by)
+values ('00000000-0000-4000-8000-000000000804','00000000-0000-4000-8000-000000000101','Platform role resume','ready_for_review','00000000-0000-4000-8000-000000000802','workspace/platform/main.tex','agent','agent');
+select is((select resume_variant_id from public.applications where id='00000000-0000-4000-8000-000000000802'), '00000000-0000-4000-8000-000000000804'::uuid, 'ready resume variant links back to its application');
 
 select * from finish();
 rollback;

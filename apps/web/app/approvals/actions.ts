@@ -14,13 +14,15 @@ export async function decideApproval(id: string, decision: "approved" | "rejecte
     if (run?.agent_job_id) await supabase.from("agent_jobs").update({ status: "queued", error_message: null, scheduled_for: new Date().toISOString(), updated_by: "user" }).eq("id", run.agent_job_id).eq("user_id", user.id).eq("status", "needs_user_input");
   }
   if (decision === "approved" && /application[._-]form[._-]fill/i.test(approval.action_type)) {
+    const approvedPayload = approval.payload && typeof approval.payload === "object" && !Array.isArray(approval.payload) ? approval.payload as Record<string, unknown> : {};
+    const portalUrl = typeof approvedPayload.portalUrl === "string" ? approvedPayload.portalUrl : undefined;
     await supabase.from("agent_jobs").insert({
       user_id: user.id,
       agent_id: "career-application-manager",
       title: `Approved form preparation: ${approval.title}`,
       queue: "browser",
       input_type: "application.form_fill",
-      input: { schemaVersion: 1, type: "application.form_fill", approvalId: approval.id, approvedPayload: approval.payload, applicationId: approval.target_object_id },
+      input: { schemaVersion: 1, type: "application.form_fill", mode: "execute_approved_fill", approvalId: approval.id, approvedPayload: approval.payload, applicationId: approval.target_object_id, portalUrl },
       related_object_ids: approval.target_object_id ? [approval.target_object_id] : [],
       required_capabilities: ["browser_fill_after_approval"],
       priority: 100,

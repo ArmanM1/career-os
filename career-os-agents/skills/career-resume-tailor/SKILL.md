@@ -12,6 +12,12 @@ optional templates.
 
 For variants, use only verified component records.
 
+- Call `career.resumes.read` and treat its verified experiences, achievements,
+  projects, and skills as the complete factual source. Uploaded resume versions
+  are provenance/layout references, not mandatory bases.
+- When the input includes `applicationId`, create a fresh opportunity-specific
+  LaTeX source and PDF, link the variant to that application, and include every
+  selected component in `resume_variant_items` with its source object ID.
 - Select evidence that matches the role while preserving factual meaning.
 - Never invent a technology, date, metric, responsibility, or outcome.
 - Generate a new variant without approval; never overwrite a base source.

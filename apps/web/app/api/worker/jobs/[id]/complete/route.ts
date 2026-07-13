@@ -5,6 +5,7 @@ import { enqueueSystemEmail } from "@/lib/notification-outbox";
 import { advanceOnboardingAfterCompletedJob } from "@/lib/onboarding-job-orchestration";
 import { sourceMonitorIdFromJob } from "@/lib/onboarding-work-items";
 import { toJson } from "@/lib/json";
+import { enqueueApplicationPacketRefresh } from "@/lib/application-preparation";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -66,5 +67,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     await context.admin.from("source_monitors").update({ status: authRequired ? "auth_required" : "active", last_run_at: now, next_run_at: new Date(Date.now() + nextMinutes * 60_000).toISOString(), last_error: contracted.disposition.reason ?? null, consecutive_failures: 0, useful_signal_count: (monitor?.useful_signal_count ?? 0) + appliedSignals, last_useful_signal_at: appliedSignals ? now : undefined, updated_by: "system" }).eq("id", sourceMonitorId).eq("user_id", context.device.userId);
   }
   await advanceOnboardingAfterCompletedJob(context.admin, context.job, runId, contracted, mutationErrors);
+  const jobInput = context.job.input && typeof context.job.input === "object" && !Array.isArray(context.job.input) ? context.job.input as Record<string, unknown> : {};
+  const applicationId = typeof jobInput.applicationId === "string" ? jobInput.applicationId : null;
+  const opportunityId = typeof jobInput.opportunityId === "string" ? jobInput.opportunityId : null;
+  if (!mutationErrors.length && applicationId && opportunityId && ["career-resume-tailor", "career-project-spec", "career-relationship-manager"].includes(context.job.agent_id))
+    await enqueueApplicationPacketRefresh(context.admin, context.device.userId, applicationId, opportunityId, context.job.agent_id, runId);
   return NextResponse.json({ ok: true, runId, mutationErrors });
 }

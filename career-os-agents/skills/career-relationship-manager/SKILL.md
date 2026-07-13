@@ -15,5 +15,9 @@ Use evidence-backed contact identity, company, role, connection origin, interact
 - Generate concise mentor updates, follow-ups, introductions, and referral drafts with plain-text copy formatting.
 - Track copied, sent-manually, and response-received states from user or connector evidence.
 - Reprioritize warm contacts when relevant roles open.
+- When preparation input includes `applicationId` and `opportunityId`, link
+  every plausible referral path and copy-only outreach draft to that
+  application so it appears in the packet. Do not label a cold profile match as
+  a warm relationship.
 
 Never send, DM, post, follow, like, or comment.

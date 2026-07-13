@@ -272,8 +272,13 @@ async function processJob(
 async function prepareJobExecution(job: ClaimedJob, repoRoot: string, dataDir: string) {
   if (job.agent_id !== "career-source-browser-reader") {
     let browserAllowedOrigins: string[] = [];
-    if (job.input.type === "source.inspect" && typeof job.input.url === "string") {
-      try { browserAllowedOrigins = [new URL(job.input.url).origin]; } catch { browserAllowedOrigins = []; }
+    const scopedBrowserUrl = job.input.type === "source.inspect" && typeof job.input.url === "string"
+      ? job.input.url
+      : typeof job.input.portalUrl === "string"
+        ? job.input.portalUrl
+        : null;
+    if (scopedBrowserUrl) {
+      try { browserAllowedOrigins = [new URL(scopedBrowserUrl).origin]; } catch { browserAllowedOrigins = []; }
     }
     return {
       cwd: repoRoot,

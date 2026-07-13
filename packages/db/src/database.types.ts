@@ -703,6 +703,7 @@ export type Database = {
           last_status_checked_at: string | null
           last_status_evidence_id: string | null
           metadata: Json
+          next_action: string | null
           next_action_task_id: string | null
           next_status_check_at: string | null
           opportunity_id: string | null
@@ -733,6 +734,7 @@ export type Database = {
           last_status_checked_at?: string | null
           last_status_evidence_id?: string | null
           metadata?: Json
+          next_action?: string | null
           next_action_task_id?: string | null
           next_status_check_at?: string | null
           opportunity_id?: string | null
@@ -763,6 +765,7 @@ export type Database = {
           last_status_checked_at?: string | null
           last_status_evidence_id?: string | null
           metadata?: Json
+          next_action?: string | null
           next_action_task_id?: string | null
           next_status_check_at?: string | null
           opportunity_id?: string | null
@@ -6136,8 +6139,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_application_workflow_mutation: {
+        Args: { p_mutation_id: string }
+        Returns: Json
+      }
       apply_career_mutation: { Args: { p_mutation_id: string }; Returns: Json }
       apply_career_mutation_legacy: {
+        Args: { p_mutation_id: string }
+        Returns: Json
+      }
+      apply_career_mutation_pre_application: {
         Args: { p_mutation_id: string }
         Returns: Json
       }
